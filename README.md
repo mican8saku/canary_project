@@ -49,6 +49,7 @@ source env/Scripts/activate
 
 ### 3. Installera dependencies
 När miljön är aktiverad (du bör se (env) i terminalen), installera nödvändiga paket.
+
 **På Raspberry Pi (för hårdvarustöd):**
 ```
 pip install -r requirements.txt --break-system-packages
