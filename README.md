@@ -6,7 +6,7 @@ Detta projekt är en smart övervakningsstation för en fågelbur, byggd på en 
 * **Temperatur & Luftfuktighet:** Mäts i realtid med en DHT11-sensor.
 * **Rörelsedetektion:** En HC-SR501 PIR-sensor känner av när fågeln är aktiv.
 * **Ljussensor:** TSL2591 (I2C) mäter exakt ljusstyrka i lux för att avgöra dag/natt.
-* **RGB-belysning:** WS2812B (Neopixels) används för statusindikationer och nattljus.
+* **RGB-belysning:** WS2812B (Neopixels) används för att simulera solljus tillförsel med UV-Lampa.
 * **Automatiska rullgardiner:** Fyra stycken 28BYJ-48 stegmotorer med ULN2003-drivkort. Motorerna är parallellkopplade och styrs gemensamt från samma GPIO-pinnar.
 * **Kamera:** Raspberry Pi Camera Module 3 används för att ta bilder och streama video.
 * **Webbserver:** En Flask-applikation som samlar all data och möjliggör fjärrstyrning.
