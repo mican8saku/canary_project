@@ -33,14 +33,30 @@ cd canary_project
 ```
 
 ### 2. Sätt upp den virtuella miljön (venv)
+- **Mac / Linux / Raspberry Pi:**
 ```
 python3 -m venv env --system-site-packages
 source env/bin/activate
 ```
+- **Windows (PowerShell):**
+```
+.\env\Scripts\activate
+```
+- **Windows (Git Bash / Command Prompt):**
+```
+source env/Scripts/activate
+```
 
 ### 3. Installera dependencies
+När miljön är aktiverad (du bör se (env) i terminalen), installera nödvändiga paket.
+**På Raspberry Pi (för hårdvarustöd):**
 ```
 pip install -r requirements.txt --break-system-packages
+```
+
+**På Mac/Windows/Linux (för lokal utveckling/mocking):**
+```
+pip install flask flask-cors
 ```
 
 ### 4. Aktivera systemtjänster
@@ -52,5 +68,6 @@ Eftersom LED-strippen kräver DMA-rättigheter körs programmet med `sudo -E`:
 sudo -E ./env/bin/python main.py
 ```
 
+- Webbgränssnittet nås på: `http://<din-pi-ip>:5000`
 
-Webbgränssnittet nås på: `http://<din-pi-ip>:5000`
+- Lokalt via mocking på: `http://localhost:5000/`
