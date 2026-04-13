@@ -62,6 +62,7 @@ pip install flask flask-cors
 
 ## 🏃‍♂️ Köra Projektet
 Eftersom LED-strippen kräver DMA-rättigheter körs programmet med `sudo -E`:
+**På Raspberry Pi**
 ```
 sudo -E ./env/bin/python main.py
 ```
