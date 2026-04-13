@@ -60,9 +60,6 @@ pip install -r requirements.txt --break-system-packages
 pip install flask flask-cors
 ```
 
-### 4. Aktivera systemtjänster
-Använd `sudo raspi-config` för att aktivera I2C och Camera under Interface Options.
-
 ## 🏃‍♂️ Köra Projektet
 Eftersom LED-strippen kräver DMA-rättigheter körs programmet med `sudo -E`:
 ```
