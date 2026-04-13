@@ -33,9 +33,11 @@ cd canary_project
 ```
 
 ### 2. Sätt upp den virtuella miljön (venv)
+```
+python3 -m venv env
+```
 - **Mac / Linux / Raspberry Pi:**
 ```
-python3 -m venv env --system-site-packages
 source env/bin/activate
 ```
 - **Windows (PowerShell):**
