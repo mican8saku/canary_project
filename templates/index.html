@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>RP4-Canary Kontroll</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #1a1a1a; color: white; padding: 20px; }
+        .section { background: #2c3e50; padding: 20px; border-radius: 15px; margin-bottom: 20px; max-width: 400px; margin-left: auto; margin-right: auto; }
+        .btn { padding: 20px; width: 45%; font-size: 18px; margin: 5px; border-radius: 10px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        
+        /* Färger */
+        .btn-motor { background: #3498db; color: white; }
+        .btn-on { background: #2ecc71; color: white; }
+        .btn-off { background: #e74c3c; color: white; }
+        
+        .status-box { color: #f1c40f; font-weight: bold; margin-top: 10px; }
+        .btn:active { transform: scale(0.95); }
+    </style>
+</head>
+<body>
+    <h1>Smart Hem Kontroll</h1>
+    <p>Ansluten via Tailscale</p>
+
+    <div class="section">
+        <h3>Rullgardin</h3>
+        <a href="/upp"><button class="btn btn-motor">▲ UPP</button></a>
+        <a href="/ner"><button class="btn btn-motor">▼ NER</button></a>
+    </div>
+
+    <div class="section">
+        <h3>Belysning</h3>
+        <a href="/on"><button class="btn btn-on">TÄND</button></a>
+        <a href="/off"><button class="btn btn-off">SLÄCK</button></a>
+    </div>
+
+    <div class="status-box">
+        Status: {{ status }}
+    </div>
+</body>
+</html>
