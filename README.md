@@ -34,23 +34,52 @@ cd canary_project
 
 ### 2. Sätt upp den virtuella miljön (venv)
 ```
-python3 -m venv env --system-site-packages
+python3 -m venv env
+```
+- **Mac / Linux / Raspberry Pi:**
+```
 source env/bin/activate
+```
+- **Windows (PowerShell):**
+```
+.\env\Scripts\activate
+```
+- **Windows (Git Bash / Command Prompt):**
+```
+source env/Scripts/activate
 ```
 
 ### 3. Installera dependencies
+När miljön är aktiverad (du bör se (env) i terminalen), installera nödvändiga paket.
+
+**På Raspberry Pi (för hårdvarustöd):**
 ```
 pip install -r requirements.txt --break-system-packages
 ```
 
-### 4. Aktivera systemtjänster
-Använd `sudo raspi-config` för att aktivera I2C och Camera under Interface Options.
+**På Mac/Windows/Linux (för lokal utveckling/mocking):**
+```
+pip install flask flask-cors
+```
 
 ## 🏃‍♂️ Köra Projektet
 Eftersom LED-strippen kräver DMA-rättigheter körs programmet med `sudo -E`:
+
+**På Raspberry Pi**
 ```
 sudo -E ./env/bin/python main.py
 ```
 
+**På Windows (för lokal utveckling/mocking):**
+```
+python main.py
+```
 
-Webbgränssnittet nås på: `http://<din-pi-ip>:5000`
+**På Mac/Linux (för lokal utveckling/mocking):**
+```
+python3 main.py
+```
+
+- Webbgränssnittet nås på: `http://<din-pi-ip>:5000`
+
+- Lokalt via mocking på: `http://localhost:5000/`
