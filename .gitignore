@@ -2,7 +2,7 @@ env/
 __pycache__/
 *.pyc
 .DS_Store
-static/*.jpg
+static/gallery/
 test_bild.jpg
 
 canary_project.code-workspace
