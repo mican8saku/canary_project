@@ -68,9 +68,14 @@ Eftersom LED-strippen kräver DMA-rättigheter körs programmet med `sudo -E`:
 sudo -E ./env/bin/python main.py
 ```
 
-**På Mac/Windows/Linux (för lokal utveckling/mocking):**
+**På Windows (för lokal utveckling/mocking):**
 ```
 python main.py
+```
+
+**På Mac/Linux (för lokal utveckling/mocking):**
+```
+python3 main.py
 ```
 
 - Webbgränssnittet nås på: `http://<din-pi-ip>:5000`
