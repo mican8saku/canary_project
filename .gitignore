@@ -2,6 +2,8 @@ env/
 __pycache__/
 *.pyc
 .DS_Store
+static/gallery/*
+!static/gallery/.gitkeep
 static/gallery/
 test_bild.jpg
 
