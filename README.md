@@ -28,7 +28,7 @@ Alla fyra stegmotorer delar samma styrpinnar (22, 27, 17, 4). De rör sig allts�
 
 ### 1. Klona projektet
 ```
-git clone https://github.com/DITT_ANVÄNDARNAMN/canary_project.git
+git clone https://github.com/mican8saku/canary_project.git
 cd canary_project
 ```
 
