@@ -1,3 +1,14 @@
+Adafruit-Blinka==9.0.4
+adafruit-circuitpython-busdevice==5.2.16
+adafruit-circuitpython-connectionmanager==3.1.7
+adafruit-circuitpython-neopixel==6.4.1
+adafruit-circuitpython-pixelbuf==2.0.11
+adafruit-circuitpython-requests==4.1.16
+adafruit-circuitpython-tsl2591==1.4.7
+adafruit-circuitpython-typing==1.12.3
+Adafruit-PlatformDetect==3.88.0
+Adafruit-PureIO==1.1.11
+apt-listchanges==4.8
 arrow==1.3.0
 asgiref==3.8.1
 astroid==3.3.8
@@ -8,6 +19,7 @@ av==14.2.0
 babel==2.17.0
 bcrypt==4.2.0
 beautifulsoup4==4.13.4
+binho-host-adapter==0.1.6
 blinker==1.9.0
 certifi==2025.1.31
 chardet==5.2.0
@@ -67,7 +79,7 @@ packaging==25.0
 parso==0.8.4
 pexpect==4.9.0
 pgzero==1.2.1
-picamera2==0.3.32
+picamera2==0.3.34
 picamzero==1.0.2
 pidng==4.0.9
 piexif==1.1.3
@@ -79,6 +91,7 @@ pyasyncore==1.0.2
 pycairo==1.27.0
 pycryptodomex==3.20.0
 pycups==2.0.4
+pyftdi==0.57.1
 pygame==2.6.1
 Pygments==2.18.0
 PyGObject==3.50.0
@@ -96,6 +109,7 @@ python-dateutil==2.9.0
 python-dotenv==1.0.1
 python-prctl==1.8.1
 pyudev==0.24.3
+pyusb==1.3.1
 PyYAML==6.0.2
 referencing==0.36.2
 reportlab==4.3.1
@@ -110,6 +124,7 @@ rpds-py==0.21.0
 rpi-keyboard-config==1.0
 rpi-lgpio==0.6
 RPi.GPIO==0.7.1
+rpi_ws281x==5.0.0
 RTIMULib==7.2.1
 Send2Trash==1.8.3
 sense-hat==2.6.0
@@ -120,6 +135,7 @@ smbus2==0.4.3
 soupsieve==2.7
 spidev==3.6
 ssh-import-id==5.10
+sysv_ipc==1.2.0
 thonny==4.1.7
 tomlkit==0.13.2
 tqdm==4.67.1
