@@ -5,6 +5,15 @@ from flask import Flask, render_template, jsonify, send_from_directory
 
 app = Flask(__name__)
 
+# Definiera var bilderna ska sparas
+# Vi lägger dem i static/captures så att webbläsaren kan hitta dem sen
+UPLOAD_FOLDER = os.path.join('static', 'gallery')
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Skapa mappen automatiskt om den inte finns, annars kraschar rpicam-still
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
 # Inställningar för galleri
 IMAGE_FOLDER = 'static/gallery'
 if not os.path.exists(IMAGE_FOLDER):
@@ -41,7 +50,12 @@ def take_photo(filename):
     if IS_PI:
         # På Pi 4 använder vi oftast 'libcamera-still'
         try:
-            subprocess.run(['libcamera-still', '-o', filepath, '--immediate'], check=True)
+            subprocess.run(['rpicam-still', 
+                '-o', filepath, 
+                '-t', '200', 
+                '--nopreview',
+                '--vflip', 
+                '--hflip'], check=True)
             return True
         except Exception as e:
             print(f"Kamerafel: {e}")
@@ -59,18 +73,22 @@ def index():
     return render_template('index.html', status="System online")
 
 # --- API ENDPOINTS (För framtida Lovable-app) ---
+
 @app.route('/api/status')
 def get_status():
+    # 1. Sätt fasta värden som vi VET fungerar
+    temp, hum = 22.0, 40.0
+    lux = 0.0
+
     if IS_PI:
+        # 2. Läs BARA TSL-sensorn (den använder I2C och hänger sig nästan aldrig)
         try:
-            temp = dht_device.temperature
-            hum = dht_device.humidity
             lux = tsl_sensor.lux
-        except:
-            temp, hum, lux = 0, 0, 0
-    else:
-        temp, hum, lux = 22.0, 40, 550.0 # Fake data
-        
+        except Exception as e:
+            print(f"Ljus-sensorfel: {e}")
+            lux = 0.0
+            
+    # 3. Skicka tillbaka svaret direkt
     return jsonify({
         "temperature": temp,
         "humidity": hum,
@@ -96,18 +114,32 @@ def control(cmd):
     return jsonify({"error": "Okänt kommando"}), 400
 
 @app.route('/api/camera/capture')
-def capture():
-    filename = f"photo_{int(time.time())}.jpg"
-    success = take_photo(filename)
-    
-    if success:
+def capture_image():
+    if not IS_PI:
+        return jsonify({"status": "error", "message": "Inte på en Pi"})
+
+    filename = f"capture_{int(time.time())}.jpg"
+    # Se till att mappen static/gallery finns!
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+    try:
+        # Vi använder rpicam-still som fungerade i terminalen
+        # -t 100 ger kameran 100ms att ställa in ljuset (snabbare än standard)
+        # --nopreview gör att inget fönster poppar upp på Pien
+        subprocess.run(['rpicam-still', '-o', filepath, '-t', '100', '--nopreview'], check=True)
+        
+        print(f"Bild sparad: {filepath}")
         return jsonify({
             "status": "success",
             "filename": filename,
             "url": f"/static/gallery/{filename}"
         })
-    else:
-        return jsonify({"status": "error", "message": "Kunde inte ta bild"}), 500
+    except subprocess.CalledProcessError as e:
+        print(f"Kamerafel (process): {e}")
+        return jsonify({"status": "error", "message": "Kameran svarade inte"})
+    except Exception as e:
+        print(f"Allmänt fel: {e}")
+        return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/api/camera/gallery')
 def get_gallery():
