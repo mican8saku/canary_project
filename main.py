@@ -30,7 +30,7 @@ try:
     
     IS_PI = True
     # Initiera hårdvara
-    dht_device = adafruit_dht.DHT11(board.D26)
+    dht_device = adafruit_dht.DHT11(board.D25)
     i2c = board.I2C()
     tsl_sensor = adafruit_tsl2591.TSL2591(i2c)
     pixels = neopixel.NeoPixel(board.D12, 8, brightness=0.2, auto_write=False)
