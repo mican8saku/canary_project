@@ -97,14 +97,14 @@ def get_status():
             
         motion = GPIO.input(6) == 1
             
-        for _ in range(3):
-            try:
-                temp = dht_device.temperature
-                hum = dht_device.humidity
-                if temp is not None: break 
-            except Exception:
-                time.sleep(0.1)
-                continue
+        # for _ in range(3):
+        #     try:
+        #         temp = dht_device.temperature
+        #         hum = dht_device.humidity
+        #         if temp is not None: break 
+        #     except Exception:
+        #         time.sleep(0.1)
+        #         continue
     
     # Denna rad måste vara längst ut (ett steg in från 'def')
     return jsonify({
@@ -173,6 +173,10 @@ def get_gallery():
         return jsonify({"images": image_urls})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/camera/gallery_page') # Du kan döpa denna till vad du vill
+def show_gallery():
+    return render_template('gallery.html')
 
 # Route för att servera de faktiska bildfilerna
 @app.route('/static/gallery/<filename>')
