@@ -12,13 +12,15 @@
         .btn-motor { background: #3498db; color: white; }
         .btn-on { background: #2ecc71; color: white; }
         .btn-off { background: #e74c3c; color: white; }
+        .btn-camera { background: #bdc41d; color: white; }
+        .btn-gallery { background: #fac748; color: white; }
         
         .status-box { color: #f1c40f; font-weight: bold; margin-top: 10px; }
         .btn:active { transform: scale(0.95); }
     </style>
 </head>
 <body>
-    <h1>Smart Hem Kontroll</h1>
+    <h1>Smart Fågelbur Kontroll</h1>
     <p>Ansluten via Tailscale</p>
 
     <div class="section">
@@ -31,6 +33,12 @@
         <h3>Belysning</h3>
         <a href="/action/led_on"><button class="btn btn-on">TÄND</button></a>
         <a href="/action/led_off"><button class="btn btn-off">SLÄCK</button></a>
+    </div>
+
+        <div class="section">
+        <h3>Kamera</h3>
+        <a href="/api/camera/capture"><button class="btn btn-camera">TA BILD</button></a>
+        <a href="/api/camera/gallery"><button class="btn btn-gallery">GALLERI</button></a>
     </div>
 
     <div class="status-box">
