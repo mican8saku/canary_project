@@ -25,24 +25,54 @@
 
     <div class="section">
         <h3>Rullgardin</h3>
-        <a href="/action/upp"><button class="btn btn-motor">▲ UPP</button></a>
-        <a href="/action/ner"><button class="btn btn-motor">▼ NER</button></a>
+        <a onclick="sendCommand('action/upp')"><button class="btn btn-motor">▲ UPP</button></a>
+        <a onclick="sendCommand('action/ner')"><button class="btn btn-motor">▼ NER</button></a>
     </div>
 
     <div class="section">
         <h3>Belysning</h3>
-        <a href="/action/led_on"><button class="btn btn-on">TÄND</button></a>
-        <a href="/action/led_off"><button class="btn btn-off">SLÄCK</button></a>
+        <a onclick="sendCommand('action/led_on')"><button class="btn btn-on">TÄND</button></a>
+        <a onclick="sendCommand('action/led_off')"><button class="btn btn-off">SLÄCK</button></a>
     </div>
 
         <div class="section">
         <h3>Kamera</h3>
-        <a href="/api/camera/capture"><button class="btn btn-camera">TA BILD</button></a>
-        <a href="/api/camera/gallery"><button class="btn btn-gallery">GALLERI</button></a>
+        <a onclick="sendCommand('camera/capture')"><button class="btn btn-camera">TA BILD</button></a>
+        <a onclick="sendCommand('camera/gallery')"><button class="btn btn-gallery">GALLERI</button></a>
+    </div>
+
+        <div class="section">
+        <h3>Sensorer</h3>
+        <p>Temperatur: <span id="temp-val">--</span> °C</p>
+        <p>Luftfuktighet: <span id="hum-val">--</span> %</p>
+        <p>Status: <span id="motion-val">Väntar...</span></p>
     </div>
 
     <div class="status-box">
         Status: {{ status }}
     </div>
 </body>
+<script>
+function sendCommand(command) {
+    // Fetch anropar URL:en i bakgrunden utan att ladda om sidan
+    fetch('/api/' + command)
+        .then(response => response.json())
+        .then(data => {
+            console.log("Svar från servern:", data.msg);
+            // Här kan du uppdatera texten på sidan om du vill
+        })
+        .catch(err => console.error("Fel:", err));
+}
+
+// Funktion för att uppdatera status (temp/fukt) automatiskt var 5:e sekund
+setInterval(() => {
+    fetch('/api/status')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('temp-val').innerText = data.temperature;
+            document.getElementById('hum-val').innerText = data.humidity;
+            document.getElementById('motion-val').innerText = data.motion ? "RÖRELSE!" : "Stilla";
+        });
+}, 5000);
+</script>
 </html>

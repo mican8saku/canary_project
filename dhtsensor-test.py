@@ -4,7 +4,7 @@ import adafruit_dht
 from flask import Flask, render_template_string
 
 # Initiera DHT11 på GPIO 19
-dht_device = adafruit_dht.DHT11(board.D19)
+dht_device = adafruit_dht.DHT11(board.D25)
 
 app = Flask(__name__)
 
