@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RP4-Canary Galleri</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: white;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { color: #f1c40f; }
+
+        .gallery-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .image-card {
+            background: #2c3e50;
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        }
+
+        .image-card img {
+            width: 100%;
+            border-radius: 5px;
+            /* HÄR ÄR CSS-KODEN FÖR ATT FLIPPA BILDERNA */
+            transform: scaleY(-1); 
+            border: 2px solid #34495e;
+        }
+
+        .image-info {
+            margin-top: 10px;
+            font-size: 0.8em;
+            color: #bdc3c7;
+        }
+
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Kameragalleri</h1>
+    <a href="/" class="back-btn">← Tillbaka till Kontroll</a>
+
+    <div class="gallery-container" id="gallery">
+        <p id="loading">Laddar bilder...</p>
+    </div>
+
+    <script>
+        // Funktion som hämtar bildlistan från ditt API
+        function loadGallery() {
+            fetch('/api/camera/gallery')
+                .then(response => response.json())
+                .then(data => {
+                    const galleryDiv = document.getElementById('gallery');
+                    galleryDiv.innerHTML = ''; // Rensa "Laddar..." texten
+
+                    if (data.images.length === 0) {
+                        galleryDiv.innerHTML = '<p>Inga bilder hittades i galleriet.</p>';
+                        return;
+                    }
+
+                    // Loopa igenom varje bild-URL i JSON-datan
+                    data.images.forEach(imageUrl => {
+                        const card = document.createElement('div');
+                        card.className = 'image-card';
+
+                        // Skapa bild-elementet
+                        const img = document.createElement('img');
+                        img.src = imageUrl;
+                        img.alt = "Kamerabild";
+
+                        // Skapa text för filnamnet (valfritt)
+                        const info = document.createElement('div');
+                        info.className = 'image-info';
+                        const filename = imageUrl.split('/').pop();
+                        info.innerText = filename;
+
+                        card.appendChild(img);
+                        card.appendChild(info);
+                        galleryDiv.appendChild(card);
+                    });
+                })
+                .catch(err => {
+                    console.error("Kunde inte ladda galleriet:", err);
+                    document.getElementById('loading').innerText = "Fel vid laddning av bilder.";
+                });
+        }
+
+        // Kör laddningen direkt när sidan öppnas
+        window.onload = loadGallery;
+    </script>
+</body>
+</html>

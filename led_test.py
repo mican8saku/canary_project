@@ -3,7 +3,7 @@ import neopixel
 import time
 
 # Inställningar
-pixel_pin = board.D12
+pixel_pin = board.D19
 num_pixels = 8  # Ändra till så många LEDs du har på din korta strip
 ORDER = neopixel.GRB
 

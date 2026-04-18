@@ -6,7 +6,7 @@ from flask import Flask, render_template, jsonify, send_from_directory
 app = Flask(__name__)
 
 # Definiera var bilderna ska sparas
-# Vi lägger dem i static/captures så att webbläsaren kan hitta dem sen
+# Vi lägger dem i static/gallery så att webbläsaren kan hitta dem sen
 UPLOAD_FOLDER = os.path.join('static', 'gallery')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
@@ -26,22 +26,32 @@ try:
     import adafruit_dht
     import adafruit_tsl2591
     import neopixel
-    import motor  # Kräver att motor.py finns i samma mapp
+    import motor 
     
     IS_PI = True
-    # Initiera hårdvara
-    dht_device = adafruit_dht.DHT11(board.D26)
+    
+    # 1. Grundinställningar för GPIO
+    GPIO.setmode(GPIO.BCM)
+    
+    # 2. Definiera pinnar
+    PIR_PIN = 6
+    LED_PIN = 18
+    
+    # 3. Setup av pinnar (Här låg felet!)
+    GPIO.setup(PIR_PIN, GPIO.IN)   # Berätta att pin 6 är en sensor (ingång)
+    GPIO.setup(LED_PIN, GPIO.OUT)  # Berätta att pin 18 är en lampa (utgång)
+
+    # 4. Initiera övrig hårdvara
+    dht_device = adafruit_dht.DHT11(board.D25)
     i2c = board.I2C()
     tsl_sensor = adafruit_tsl2591.TSL2591(i2c)
     pixels = neopixel.NeoPixel(board.D12, 8, brightness=0.2, auto_write=False)
     motor.setup_motors()
     
-    LED_PIN = 18
-    GPIO.setup(LED_PIN, GPIO.OUT)
     print("--- Running on Raspberry Pi ---")
-except (ImportError, RuntimeError):
+except Exception as e:
     IS_PI = False
-    print("--- Running on PC (Mock Mode) ---")
+    print(f"--- Running on PC (Mock Mode) --- Error: {e}")
 
 # --- KAMERAFUNKTION ---
 def take_photo(filename):
@@ -73,45 +83,57 @@ def index():
     return render_template('index.html', status="System online")
 
 # --- API ENDPOINTS (För framtida Lovable-app) ---
-
 @app.route('/api/status')
 def get_status():
-    # 1. Sätt fasta värden som vi VET fungerar
-    temp, hum = 22.0, 40.0
+    temp, hum = None, None
     lux = 0.0
+    motion = False
 
     if IS_PI:
-        # 2. Läs BARA TSL-sensorn (den använder I2C och hänger sig nästan aldrig)
         try:
             lux = tsl_sensor.lux
-        except Exception as e:
-            print(f"Ljus-sensorfel: {e}")
+        except:
             lux = 0.0
             
-    # 3. Skicka tillbaka svaret direkt
+        motion = GPIO.input(6) == 1
+            
+        # for _ in range(3):
+        #     try:
+        #         temp = dht_device.temperature
+        #         hum = dht_device.humidity
+        #         if temp is not None: break 
+        #     except Exception:
+        #         time.sleep(0.1)
+        #         continue
+    
+    # Denna rad måste vara längst ut (ett steg in från 'def')
     return jsonify({
-        "temperature": temp,
-        "humidity": hum,
-        "light": lux,
-        "is_pi": IS_PI
+        "temperature": temp if temp is not None else "N/A",
+        "humidity": hum if hum is not None else "N/A",
+        "light": round(lux, 2) if lux else 0.0,
+        "motion": motion,
+        "is_pi": IS_PI,
+        "timestamp": time.strftime("%H:%M:%S")
     })
 
 # --- KONTROLL ROUTES ---
-@app.route('/action/<cmd>')
+@app.route('/api/action/<cmd>')
 def control(cmd):
+    if not IS_PI: return jsonify({"msg": "PC Mode"})
+    
     if cmd == "upp":
-        if IS_PI: motor.kor_gardin(2.8, -1)
+        motor.kor_gardin(2.8, -1)
         return jsonify({"msg": "Rullar upp"})
     elif cmd == "ner":
-        if IS_PI: motor.kor_gardin(2.8, 1)
+        motor.kor_gardin(2.8, 1)
         return jsonify({"msg": "Rullar ner"})
     elif cmd == "led_on":
-        if IS_PI: GPIO.output(LED_PIN, 1)
+        GPIO.output(LED_PIN, 1)
         return jsonify({"msg": "Lampa tänd"})
     elif cmd == "led_off":
-        if IS_PI: GPIO.output(LED_PIN, 0)
+        GPIO.output(LED_PIN, 0)
         return jsonify({"msg": "Lampa släckt"})
-    return jsonify({"error": "Okänt kommando"}), 400
+    return jsonify({"error": "Okänt"}), 400
 
 @app.route('/api/camera/capture')
 def capture_image():
@@ -151,6 +173,10 @@ def get_gallery():
         return jsonify({"images": image_urls})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/api/camera/gallery_page') # Du kan döpa denna till vad du vill
+def show_gallery():
+    return render_template('gallery.html')
 
 # Route för att servera de faktiska bildfilerna
 @app.route('/static/gallery/<filename>')
