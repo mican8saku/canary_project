@@ -1,190 +1,164 @@
 import os
 import time
-import subprocess # För att köra systemkommandon som libcamera
-from flask import Flask, render_template, jsonify, send_from_directory
+import json
+import subprocess
+from pathlib import Path
+from datetime import datetime, timezone
+from flask import Flask, jsonify, send_file, request
+from flask_cors import CORS
 
 app = Flask(__name__)
+# Krävs för att hans Base44-app ska kunna prata med din Pi
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Definiera var bilderna ska sparas
-# Vi lägger dem i static/gallery så att webbläsaren kan hitta dem sen
-UPLOAD_FOLDER = os.path.join('static', 'gallery')
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+# --- KONFIGURATION & FILER ---
+UPLOAD_FOLDER = Path("static/gallery")
+STATE_FILE = Path("state.json")
+UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
-# Skapa mappen automatiskt om den inte finns, annars kraschar rpicam-still
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+# --- APP STATE (Minne vid omstart) ---
+curtain_state = 0  # 0 = stängd, 100 = öppen
+last_motion_at = datetime.now(timezone.utc).isoformat()
+MOTION_IDLE_THRESHOLD = 30 # Sekunder innan fågeln räknas som inaktiv
 
-# Inställningar för galleri
-IMAGE_FOLDER = 'static/gallery'
-if not os.path.exists(IMAGE_FOLDER):
-    os.makedirs(IMAGE_FOLDER)
+def save_state():
+    try:
+        with os.fdopen(os.open(STATE_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as f:
+            json.dump({
+                "curtainState": curtain_state,
+                "lastMotionAt": last_motion_at
+            }, f, indent=2)
+    except Exception as e:
+        print(f"Kunde inte spara state: {e}")
 
-# --- MOCKING & SETUP ---
+def load_state():
+    global curtain_state, last_motion_at
+    if STATE_FILE.exists():
+        try:
+            with open(STATE_FILE, "r") as f:
+                data = json.load(f)
+                curtain_state = data.get("curtainState", 0)
+                last_motion_at = data.get("lastMotionAt", last_motion_at)
+        except: pass
+
+load_state()
+
+# --- HÅRDVARA SETUP ---
 try:
     import RPi.GPIO as GPIO
     import board
     import adafruit_dht
     import adafruit_tsl2591
-    import neopixel
     import motor 
     
     IS_PI = True
-    
-    # 1. Grundinställningar för GPIO
     GPIO.setmode(GPIO.BCM)
     
-    # 2. Definiera pinnar
     PIR_PIN = 6
     LED_PIN = 18
     
-    # 3. Setup av pinnar (Här låg felet!)
-    GPIO.setup(PIR_PIN, GPIO.IN)   # Berätta att pin 6 är en sensor (ingång)
-    GPIO.setup(LED_PIN, GPIO.OUT)  # Berätta att pin 18 är en lampa (utgång)
+    GPIO.setup(PIR_PIN, GPIO.IN)
+    GPIO.setup(LED_PIN, GPIO.OUT)
 
-    # 4. Initiera övrig hårdvara
     dht_device = adafruit_dht.DHT11(board.D25)
     i2c = board.I2C()
     tsl_sensor = adafruit_tsl2591.TSL2591(i2c)
-    pixels = neopixel.NeoPixel(board.D12, 8, brightness=0.2, auto_write=False)
     motor.setup_motors()
     
-    print("--- Running on Raspberry Pi ---")
+    print("--- System Ready on Raspberry Pi ---")
 except Exception as e:
     IS_PI = False
     print(f"--- Running on PC (Mock Mode) --- Error: {e}")
 
-# --- KAMERAFUNKTION ---
-def take_photo(filename):
-    filepath = os.path.join(IMAGE_FOLDER, filename)
+# --- HJÄLPFUNKTIONER ---
+def get_curtain_str():
+    return "open" if curtain_state == 100 else "closed"
+
+def get_bird_status(motion_now):
+    global last_motion_at
+    if motion_now:
+        last_motion_at = datetime.now(timezone.utc).isoformat()
+        save_state()
+        return "active"
     
-    if IS_PI:
-        # På Pi 4 använder vi oftast 'libcamera-still'
-        try:
-            subprocess.run(['rpicam-still', 
-                '-o', filepath, 
-                '-t', '200', 
-                '--nopreview',
-                '--vflip', 
-                '--hflip'], check=True)
-            return True
-        except Exception as e:
-            print(f"Kamerafel: {e}")
-            return False
-    else:
-        # På PC: Skapa en enkel textfil eller kopiera en dummy-bild
-        with open(filepath, 'w') as f:
-            f.write(f"Simulerad bild tagen vid {time.ctime()}")
-        print(f"Mock-bild skapad: {filename}")
-        return True
+    last_motion = datetime.fromisoformat(last_motion_at)
+    idle_time = (datetime.now(timezone.utc) - last_motion).total_seconds()
+    return "active" if idle_time < MOTION_IDLE_THRESHOLD else "inactive"
 
-# --- ROUTES ---
-@app.route('/')
-def index():
-    return render_template('index.html', status="System online")
+# --- INTEGRATION ROUTES (För Base44 gränssnitt) ---
 
-# --- API ENDPOINTS (För framtida Lovable-app) ---
-@app.route('/api/status')
-def get_status():
-    temp, hum = None, None
-    lux = 0.0
-    motion = False
-
-    if IS_PI:
-        try:
-            lux = tsl_sensor.lux
-        except:
-            lux = 0.0
-            
-        motion = GPIO.input(6) == 1
-            
-        # for _ in range(3):
-        #     try:
-        #         temp = dht_device.temperature
-        #         hum = dht_device.humidity
-        #         if temp is not None: break 
-        #     except Exception:
-        #         time.sleep(0.1)
-        #         continue
+@app.route('/status', methods=['GET'])
+def status():
+    """Huvudstatus för appen"""
+    lux = tsl_sensor.lux if IS_PI else 350.0
+    motion_now = GPIO.input(PIR_PIN) == 1 if IS_PI else False
     
-    # Denna rad måste vara längst ut (ett steg in från 'def')
+    # Mockad temperatur tills DHT11 är 100% stabil
+    temp = 22.0 
+    
     return jsonify({
-        "temperature": temp if temp is not None else "N/A",
-        "humidity": hum if hum is not None else "N/A",
-        "light": round(lux, 2) if lux else 0.0,
-        "motion": motion,
-        "is_pi": IS_PI,
-        "timestamp": time.strftime("%H:%M:%S")
+        "ok": True,
+        "data": {
+            "deviceOnline": True,
+            "isPi": IS_PI,
+            "temperature": temp,
+            "curtainState": get_curtain_str(),
+            "birdStatus": get_bird_status(motion_now),
+            "lastMotionAt": last_motion_at,
+            "light": round(lux, 2)
+        }
     })
 
-# --- KONTROLL ROUTES ---
-@app.route('/api/action/<cmd>')
-def control(cmd):
-    if not IS_PI: return jsonify({"msg": "PC Mode"})
-    
-    if cmd == "upp":
+@app.route('/curtain/open', methods=['POST'])
+def curtain_open():
+    global curtain_state
+    if IS_PI:
         motor.kor_gardin(2.8, -1)
-        return jsonify({"msg": "Rullar upp"})
-    elif cmd == "ner":
+    curtain_state = 100
+    save_state()
+    return jsonify({"ok": True, "data": {"curtainState": "open"}})
+
+@app.route('/curtain/close', methods=['POST'])
+def curtain_close():
+    global curtain_state
+    if IS_PI:
         motor.kor_gardin(2.8, 1)
-        return jsonify({"msg": "Rullar ner"})
-    elif cmd == "led_on":
-        GPIO.output(LED_PIN, 1)
-        return jsonify({"msg": "Lampa tänd"})
-    elif cmd == "led_off":
-        GPIO.output(LED_PIN, 0)
-        return jsonify({"msg": "Lampa släckt"})
-    return jsonify({"error": "Okänt"}), 400
+    curtain_state = 0
+    save_state()
+    return jsonify({"ok": True, "data": {"curtainState": "closed"}})
 
-@app.route('/api/camera/capture')
-def capture_image():
-    if not IS_PI:
-        return jsonify({"status": "error", "message": "Inte på en Pi"})
+@app.route('/camera/snapshot', methods=['GET'])
+def camera_snapshot():
+    """Tar en bild och skickar direkt till appen"""
+    filename = "snapshot.jpg"
+    filepath = UPLOAD_FOLDER / filename
+    
+    if IS_PI:
+        try:
+            # Använder rpicam-still (standard för Camera Module 3)
+            subprocess.run(['rpicam-still', '-o', str(filepath), '-t', '500', '--nopreview'], check=True)
+            return send_file(filepath, mimetype='image/jpeg')
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)}), 500
+    
+    # Om vi är på PC, skicka en placeholder
+    return jsonify({"ok": True, "mock_url": "https://placehold.co/600x400?text=Kamera+Mock"})
 
-    filename = f"capture_{int(time.time())}.jpg"
-    # Se till att mappen static/gallery finns!
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+@app.route('/led', methods=['POST'])
+def control_led():
+    """Tänder/släcker lampan baserat på JSON-data: {"on": true/false}"""
+    data = request.get_json()
+    turn_on = data.get('on', False)
+    
+    if IS_PI:
+        GPIO.output(LED_PIN, 1 if turn_on else 0)
+    
+    return jsonify({"ok": True, "led_on": turn_on})
 
-    try:
-        # Vi använder rpicam-still som fungerade i terminalen
-        # -t 100 ger kameran 100ms att ställa in ljuset (snabbare än standard)
-        # --nopreview gör att inget fönster poppar upp på Pien
-        subprocess.run(['rpicam-still', '-o', filepath, '-t', '100', '--nopreview'], check=True)
-        
-        print(f"Bild sparad: {filepath}")
-        return jsonify({
-            "status": "success",
-            "filename": filename,
-            "url": f"/static/gallery/{filename}"
-        })
-    except subprocess.CalledProcessError as e:
-        print(f"Kamerafel (process): {e}")
-        return jsonify({"status": "error", "message": "Kameran svarade inte"})
-    except Exception as e:
-        print(f"Allmänt fel: {e}")
-        return jsonify({"status": "error", "message": str(e)})
-
-@app.route('/api/camera/gallery')
-def get_gallery():
-    # Listar alla filer i galleri-mappen, sorterade med nyaste först
-    try:
-        images = os.listdir(IMAGE_FOLDER)
-        images.sort(reverse=True) 
-        image_urls = [f"/static/gallery/{img}" for img in images if img.endswith(('.jpg', '.jpeg', '.png'))]
-        return jsonify({"images": image_urls})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/camera/gallery_page') # Du kan döpa denna till vad du vill
-def show_gallery():
-    return render_template('gallery.html')
-
-# Route för att servera de faktiska bildfilerna
-@app.route('/static/gallery/<filename>')
-def serve_image(filename):
-    return send_from_directory(IMAGE_FOLDER, filename)
-
+# --- STARTA SERVER ---
 if __name__ == '__main__':
     try:
+        # Körs på port 5000 för att matcha hans frontend-anrop
         app.run(host='0.0.0.0', port=5000, debug=True)
     finally:
         if IS_PI:
