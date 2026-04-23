@@ -76,3 +76,7 @@ export async function controlLed(on) {
 export function getCameraSnapshotUrl() {
   return `${BASE_URL}/camera/snapshot?t=${Date.now()}`;
 }
+
+export async function getDiagnostics() {
+  return apiGet("/status");
+}
