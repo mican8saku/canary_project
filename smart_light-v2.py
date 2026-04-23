@@ -6,7 +6,7 @@ import time
 # --- Inställningar ---
 LUX_THRESHOLD = 30.0
 PIXEL_PIN = board.D13
-NUM_PIXELS = 30 
+NUM_PIXELS = 8 
 
 i2c = board.I2C()
 sensor = adafruit_tsl2591.TSL2591(i2c)

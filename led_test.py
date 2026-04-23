@@ -3,11 +3,11 @@ import neopixel
 import time
 
 # Inställningar
-pixel_pin = board.D19
-num_pixels = 8  # Ändra till så många LEDs du har på din korta strip
+pixel_pin = board.D13
+num_pixels = 20  # Ändra till så många LEDs du har på din korta strip
 ORDER = neopixel.GRB
 
-pixels = neopixel.NeoPixel(pixel_pin, num_pixels, brightness=0.2, auto_write=False, pixel_order=ORDER)
+pixels = neopixel.NeoPixel(pixel_pin, num_pixels, brightness=0.05, auto_write=False, pixel_order=ORDER)
 
 def rainbow_cycle(wait):
     for j in range(255):
