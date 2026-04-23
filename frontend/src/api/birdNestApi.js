@@ -2,7 +2,7 @@
  * Bird Nest API - Updated for Raspberry Pi backend
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+export const BASE_URL = import.meta.env.VITE_API_URL || "http://100.73.28.49:5000";
 
 async function parseJsonSafely(res) {
   try {

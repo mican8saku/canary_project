@@ -1,10 +1,11 @@
 import os
+import io
 import time
 import json
 import subprocess
 from pathlib import Path
 from datetime import datetime, timezone
-from flask import Flask, jsonify, send_file, request
+from flask import Flask, jsonify, send_file, request, Response
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -154,6 +155,50 @@ def control_led():
         GPIO.output(LED_PIN, 1 if turn_on else 0)
     
     return jsonify({"ok": True, "led_on": turn_on})
+
+def generate_frames():
+    """Generator som strömmar video från rpicam-vid"""
+    if not IS_PI:
+        # Mock-video för PC
+        while True:
+            time.sleep(0.5)
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + b'FAKE_IMAGE_DATA' + b'\r\n')
+    
+    # Starta rpicam-vid och strömma till stdout som JPEG-bilder
+    # Vi sänker upplösningen till 640x480 för att det ska flyta bra över nätverket
+    cmd = [
+        'rpicam-vid',
+        '-t', '0',               # Kör för evigt
+        '--inline',              # Kräv varje ram för sig
+        '--width', '640',
+        '--height', '480',
+        '--framerate', '15',      # 15 FPS räcker gott
+        '--codec', 'mjpeg',       # Viktigt: Vi vill ha MJPEG för denna stream
+        '-o', '-'                # Skicka till stdout
+    ]
+    
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+    
+    try:
+        while True:
+            # Läs en ram från processen
+            # MJPEG-ramar börjar med 0xff 0xd8 och slutar med 0xff 0xd9
+            # För enkelhets skull läser vi i chunks
+            frame = process.stdout.read(65536) 
+            if not frame:
+                break
+            
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+    finally:
+        process.terminate()
+
+@app.route('/camera/stream')
+def camera_stream():
+    """Video stream route"""
+    return Response(generate_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
 
 # --- STARTA SERVER ---
 if __name__ == '__main__':

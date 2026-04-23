@@ -34,7 +34,7 @@ interface LedResponse {
   ledState: boolean;
 }
 
-const BASE_URL = import.meta.env.VITE_API_URL;
+export const BASE_URL = import.meta.env.VITE_API_URL;
 
 async function handleApiResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
