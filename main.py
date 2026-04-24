@@ -54,6 +54,7 @@ try:
     
     IS_PI = True
     GPIO.setmode(GPIO.BCM)
+    GPIO.setwarnings(False)
     
     PIR_PIN = 6
     LED_PIN = 18
@@ -157,40 +158,48 @@ def control_led():
     return jsonify({"ok": True, "led_on": turn_on})
 
 def generate_frames():
-    """Generator som strömmar video från rpicam-vid"""
+    """Generator som strömmar video med tydligare bild-gränser"""
     if not IS_PI:
-        # Mock-video för PC
         while True:
             time.sleep(0.5)
             yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + b'FAKE_IMAGE_DATA' + b'\r\n')
-    
-    # Starta rpicam-vid och strömma till stdout som JPEG-bilder
-    # Vi sänker upplösningen till 640x480 för att det ska flyta bra över nätverket
+                   b'Content-Type: image/jpeg\r\n\r\n' + b'FAKE_DATA' + b'\r\n')
+        return
+
+    # Vi använder -n för att slippa preview-fönstret på Pi:n
     cmd = [
         'rpicam-vid',
-        '-t', '0',               # Kör för evigt
-        '--inline',              # Kräv varje ram för sig
+        '-t', '0',
+        '--inline',
         '--width', '640',
         '--height', '480',
-        '--framerate', '15',      # 15 FPS räcker gott
-        '--codec', 'mjpeg',       # Viktigt: Vi vill ha MJPEG för denna stream
-        '-o', '-'                # Skicka till stdout
+        '--framerate', '15',
+        '--codec', 'mjpeg',
+        '-n', 
+        '-o', '-'
     ]
     
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=0)
     
     try:
+        # MJPEG skickar bilder som börjar med 0xff 0xd8 och slutar med 0xff 0xd9
+        # Vi läser dataströmmen och letar efter dessa markörer
+        buffer = b""
         while True:
-            # Läs en ram från processen
-            # MJPEG-ramar börjar med 0xff 0xd8 och slutar med 0xff 0xd9
-            # För enkelhets skull läser vi i chunks
-            frame = process.stdout.read(65536) 
-            if not frame:
+            chunk = process.stdout.read(4096)
+            if not chunk:
                 break
+            buffer += chunk
             
-            yield (b'--frame\r\n'
-                   b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+            # Leta efter start och slut på en JPEG-bild
+            start = buffer.find(b'\xff\xd8')
+            end = buffer.find(b'\xff\xd9')
+            
+            if start != -1 and end != -1 and end > start:
+                jpg = buffer[start:end+2]
+                buffer = buffer[end+2:]
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
     finally:
         process.terminate()
 

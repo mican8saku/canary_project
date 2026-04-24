@@ -1,11 +1,12 @@
 import RPi.GPIO as GPIO
 import time
 
-PIR_PIN = 6
+PIR_PIN = 14
 LED_PIN = 18
 LIGHT_TIME = 5 # Hur många sekunder lampan ska lysa efter rörelse
 
 GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
 GPIO.setup(PIR_PIN, GPIO.IN)
 GPIO.setup(LED_PIN, GPIO.OUT)
 
