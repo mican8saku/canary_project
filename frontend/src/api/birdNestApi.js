@@ -80,3 +80,7 @@ export function getCameraSnapshotUrl() {
 export async function getDiagnostics() {
   return apiGet("/status");
 }
+
+export function getCameraStreamUrl() {
+  return `${BASE_URL}/camera/stream`;
+}
