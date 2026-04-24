@@ -2,7 +2,7 @@ import time
 import board
 import neopixel
 
-PIXEL_PIN = board.D19      # GPIO18 (pin 12)
+PIXEL_PIN = board.D19      # GPIO19
 NUM_PIXELS = 8            # ändra till din längd
 BRIGHTNESS = 0.2           # låg ljusstyrka = säkrare
 

@@ -23,7 +23,7 @@ def kor_gardin(varv, riktning):
         for step in sekvens:
             for i in range(4):
                 GPIO.output(motor_pins[i], step[i])
-            time.sleep(0.0015)
+            time.sleep(0.0010)
             
     # Stäng av strömmen (viktigt!)
     for pin in motor_pins:

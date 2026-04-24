@@ -50,13 +50,13 @@ try:
             # Rulla upp (Kör sekvensen framåt)
             step_counter = (step_counter + 1) % 8
             ta_ett_steg(step_counter)
-            time.sleep(0.0015) # Hastighet
+            time.sleep(0.0010) # Hastighet
             
         elif down_pressed:
             # Rulla ner (Kör sekvensen bakåt)
             step_counter = (step_counter - 1) % 8
             ta_ett_steg(step_counter)
-            time.sleep(0.0015) # Hastighet
+            time.sleep(0.0010) # Hastighet
             
         else:
             # Ingen knapp tryckt -> se till att motorn inte drar ström
