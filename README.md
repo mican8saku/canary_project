@@ -1,4 +1,4 @@
-# 🐦 Canary Project (Temporärt Namn) - Smart Fågelövervakning
+# 🐦 Parande SmartNest - Smart Fågelövervakning
 
 Detta projekt är en smart övervakningsstation för en fågelbur, byggd på en **Raspberry Pi 4**. Systemet kombinerar sensorer för miljöövervakning, rörelsedetektion, reglering av ljusmängd med rullgardiner (styrda med stegmotorer) och RGB-ledstrip som är tänkt att simulera användning av en starkare UV lampa. Allt styrs och visas via ett webbgränssnitt byggt i **Flask**.
 
