@@ -5,7 +5,7 @@ import time
 
 # --- Inställningar ---
 LUX_THRESHOLD = 30.0
-PIXEL_PIN = board.D13
+PIXEL_PIN = board.D12
 NUM_PIXELS = 8 
 
 i2c = board.I2C()
