@@ -6,5 +6,6 @@ static/gallery/*
 !static/gallery/.gitkeep
 static/gallery/
 test_bild.jpg
+state.json
 
 canary_project.code-workspace
