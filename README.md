@@ -1,4 +1,4 @@
-# 🐦 Canary Project (Temporärt Namn) - Smart Fågelövervakning
+# 🐦 Parande SmartNest - Smart Fågelövervakning
 
 Detta projekt är en smart övervakningsstation för en fågelbur, byggd på en **Raspberry Pi 4**. Systemet kombinerar sensorer för miljöövervakning, rörelsedetektion, reglering av ljusmängd med rullgardiner (styrda med stegmotorer) och RGB-ledstrip som är tänkt att simulera användning av en starkare UV lampa. Allt styrs och visas via ett webbgränssnitt byggt i **Flask**.
 
@@ -16,7 +16,7 @@ Detta projekt är en smart övervakningsstation för en fågelbur, byggd på en 
 | Komponent | Anslutning | GPIO-pinnar (BCM) |
 | :--- | :--- | :--- |
 | **DHT11** | Data | GPIO 26 |
-| **HC-SR501 PIR** | Digital ut | GPIO 13 |
+| **HC-SR501 PIR** | Digital ut | GPIO 14 (TXD) |
 | **WS2812B LED** | Data | GPIO 12 |
 | **TSL2591** | I2C SDA / SCL | GPIO 2 (SDA), GPIO 3 (SCL) |
 | **Kamera Module 3** | CSI-port | – (ingen GPIO) |
