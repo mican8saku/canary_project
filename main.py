@@ -110,6 +110,44 @@ def button_control_thread():
             # Ingen knapp tryckt
             time.sleep(0.05)
 
+# I main.py
+
+def flytta_gardin_gradvis(target_percent):
+    global curtain_state
+    
+    # Mappa dina riktningar: 
+    # Enligt din tidigare kod: Open = -1, Close = 1
+    direction = -1 if target_percent > curtain_state else 1
+    
+    print(f"Rör gardin från {curtain_state}% till {target_percent}%")
+
+    while curtain_state != target_percent:
+        # Beräkna hur många procent vi ska flytta i detta steg
+        diff = abs(target_percent - curtain_state)
+        step_percent = min(5, diff) # Max 5% per uppdatering för UI:t
+        
+        # Räkna ut varv: (2.8 varv totalt / 100) * antal procent
+        varv_att_kora = (2.8 / 100) * step_percent
+        
+        if IS_PI:
+            # Anropa din motor-funktion
+            # Den kommer köra i ca 0.2 sekunder (204 steg * 0.0010s)
+            motor.kor_gardin(varv_att_kora, direction)
+        else:
+            time.sleep(0.1) # Demo på PC
+
+        # Uppdatera variabeln
+        if direction == -1: # Öppnar (ökar %)
+            curtain_state = min(100, curtain_state + step_percent)
+        else: # Stänger (minskar %)
+            curtain_state = max(0, curtain_state - step_percent)
+            
+        # SPARA TILL FIL - Detta gör att appen ser rörelsen i realtid!
+        save_state()
+        print(f"Position: {curtain_state}%")
+
+    print("Rörelse klar.")
+
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
     return "open" if curtain_state == 100 else "closed"
