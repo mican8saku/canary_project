@@ -73,7 +73,9 @@ export function useBirdNest() {
     setCurtainLoading(true);
     try {
       const res = await apiOpen();
-      setCurtainState(res.curtainState);
+      if (res && typeof res.curtainState === 'number') {
+        setCurtainState(res.curtainState) 
+      };
     } finally {
       setCurtainLoading(false);
     }
@@ -84,7 +86,9 @@ export function useBirdNest() {
     setCurtainLoading(true);
     try {
       const res = await apiClose();
-      setCurtainState(res.curtainState);
+      if (res && typeof res.curtainState === 'number') {
+        setCurtainState(res.curtainState)
+      };
     } finally {
       setCurtainLoading(false);
     }

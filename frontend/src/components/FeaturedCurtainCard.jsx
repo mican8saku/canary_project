@@ -17,17 +17,25 @@ export default function FeaturedCurtainCard({ name, room, icon: Icon, curtainSta
   const [activeAction, setActiveAction] = useState(null);
 
   async function handleOpen() {
-    if (curtainLoading || isFullyOpen) return; // Kan inte öppna mer om redan på 100%
+    if (curtainLoading || isFullyOpen) return;
     setActiveAction("opening");
-    await onOpen?.();
-    setActiveAction(null);
+    try {
+      await onOpen?.();
+    } finally {
+      // Genom att lägga detta i 'finally' garanterar vi 
+      // att "Opening..." försvinner så fort API-svaret kommit
+      setActiveAction(null);
+    }
   }
 
   async function handleClose() {
-    if (curtainLoading || isFullyClosed) return; // Kan inte stänga mer om redan på 0%
+    if (curtainLoading || isFullyClosed) return;
     setActiveAction("closing");
-    await onClose?.();
-    setActiveAction(null);
+    try {
+      await onClose?.();
+    } finally {
+      setActiveAction(null);
+    }
   }
 
   const busy = activeAction !== null;
