@@ -44,7 +44,13 @@ export default function Settings() {
   useEffect(() => {
     setDiagLoading(true);
     getDiagnostics()
-      .then((data) => { setDiag(data); setDiagError(null); })
+    .then((data) => {
+        console.log("API Response:", data);
+        if(data && data.ok) {
+          setDiag(data);
+        }
+          setDiagError(null); 
+      })
       .catch((err) => setDiagError(err.message || "Failed to load diagnostics"))
       .finally(() => setDiagLoading(false));
   }, []);

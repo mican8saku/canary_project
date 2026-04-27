@@ -5,7 +5,7 @@ import {
   closeCurtain as apiClose,
 } from "../api/birdNestApi";
 
-const POLL_INTERVAL_MS = 5_000;
+const POLL_INTERVAL_MS = 2_000;
 
 function formatLastMotion(isoString) {
   if (!isoString) return "Unknown";
@@ -73,7 +73,9 @@ export function useBirdNest() {
     setCurtainLoading(true);
     try {
       const res = await apiOpen();
-      setCurtainState(res.curtainState);
+      if (res && typeof res.curtainState === 'number') {
+        setCurtainState(res.curtainState) 
+      };
     } finally {
       setCurtainLoading(false);
     }
@@ -84,7 +86,9 @@ export function useBirdNest() {
     setCurtainLoading(true);
     try {
       const res = await apiClose();
-      setCurtainState(res.curtainState);
+      if (res && typeof res.curtainState === 'number') {
+        setCurtainState(res.curtainState)
+      };
     } finally {
       setCurtainLoading(false);
     }

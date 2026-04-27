@@ -15,22 +15,18 @@ async function parseJsonSafely(res) {
 async function apiGet(path) {
   const res = await fetch(`${BASE_URL}${path}`, {
     method: "GET",
-    headers: {
-      Accept: "application/json",
-    },
+    headers: { "Accept": "application/json" },
   });
 
   const result = await parseJsonSafely(res);
 
-  if (!res.ok) {
-    throw new Error(result?.error || `GET ${path} failed: ${res.status}`);
-  }
-
-  if (!result?.ok) {
+  if (!res.ok || !result?.ok) {
     throw new Error(result?.error || `GET ${path} failed`);
   }
 
-  return result.data;
+  // Om resultatet har en 'data'-nyckel, returnera den. 
+  // Annars returnera hela objektet (vilket behövs för din nya status-route).
+  return result.data !== undefined ? result.data : result;
 }
 
 async function apiPost(path, body = {}) {
