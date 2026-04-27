@@ -98,16 +98,17 @@ export function useBirdNest() {
     }
   }, [curtainLoading]);
 
+  // ---- Light Control ------ 
   const toggleLight = useCallback(async () => {
   try {
     const res = await apiPost('/light/toggle'); 
-    if (res && res.ok) {
+    if (res && res.lightOn !== undefined) {
       setLightOn(res.lightOn);
     }
   } catch (err) {
     console.error("Kunde inte ändra ljus:", err);
   }
-  }, []);
+}, []); // Tom array är ok här om du inte använder lightOn-variabeln inuti try-blocket
 
   return {
     temperature,
