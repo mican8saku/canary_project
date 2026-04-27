@@ -24,6 +24,7 @@ UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 # --- APP STATE (Minne vid omstart) ---
 curtain_state = 0  # 0 = stängd, 100 = öppen
 is_moving = False
+light_state = False
 last_motion_at = datetime.now(timezone.utc).isoformat()
 MOTION_IDLE_THRESHOLD = 30 # Sekunder innan fågeln räknas som inaktiv
 
@@ -56,7 +57,8 @@ try:
     import board
     import adafruit_dht
     import adafruit_tsl2591
-    import motor 
+    import motor
+    import light
     
     IS_PI = True
     GPIO.setmode(GPIO.BCM)
@@ -70,7 +72,7 @@ try:
     
     GPIO.setup(PIR_PIN, GPIO.IN)
     GPIO.setup(LED_PIN, GPIO.OUT)
-    GPIO.setup(LEDSTRIP_PIN, GPIO.OUT)
+    GPIO.setup(LEDSTRIP_BUTTON, GPIO.OUT)
     GPIO.setup(BUTTON_UP, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(BUTTON_DOWN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(LEDSTRIP_BUTTON, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -115,29 +117,45 @@ def flytta_gardin_gradvis(target_percent):
         is_moving = False
 
 def button_control_thread():
-    global curtain_state, is_moving
-    print("Knapp-kontroll startad (Mjuk med stopp-skydd).")
+    global curtain_state, is_moving, light_state
+    print("Knapp-kontroll startad.")
     
     needs_saving = False 
     
     while True:
-        if not IS_PI or is_moving:
+        if not IS_PI:
+            time.sleep(0.5)
+            continue
+
+        # --- LJUSKONTROLL (Kolla denna först, den ska alltid gå att trycka på) ---
+        if GPIO.input(LEDSTRIP_BUTTON) == GPIO.LOW:
+            light_state = not light_state
+            
+            def run_light():
+                light.set_light(light_state)
+            
+            threading.Thread(target=run_light).start()
+            
+            while GPIO.input(LEDSTRIP_BUTTON) == GPIO.LOW:
+                time.sleep(0.1)
+
+        # --- GARDINKONTROLL ---
+        # Vi låter knapparna fungera även om is_moving är True (så man kan avbryta/justera)
+        # men om du vill ha den helt låst under API-körning, behåll "if is_moving: continue"
+        if is_moving:
             time.sleep(0.1)
             continue
-            
+
         up_pressed = GPIO.input(BUTTON_UP) == GPIO.LOW
         down_pressed = GPIO.input(BUTTON_DOWN) == GPIO.LOW
 
         if up_pressed and curtain_state < 100:
-            # Vi kör 0.05 varv (~1.8%)
             motor.kor_gardin(0.05, -1)
-            # Vi ökar med 2% men ser till att aldrig gå över 100
             curtain_state = min(100, curtain_state + 2)
             needs_saving = True
             
         elif down_pressed and curtain_state > 0:
             motor.kor_gardin(0.05, 1)
-            # Vi minskar med 2% men ser till att aldrig gå under 0
             curtain_state = max(0, curtain_state - 2)
             needs_saving = True
         
@@ -147,8 +165,6 @@ def button_control_thread():
                 print(f"Position låst vid: {curtain_state}%")
                 needs_saving = False
             
-            # Lite längre vila här (0.05) för att ge processorn andrum 
-            # och undvika att den "dubbel-läser" precis i slutet
             time.sleep(0.05)
 
 # --- HJÄLPFUNKTIONER ---
@@ -174,25 +190,26 @@ def status():
     lux = tsl_sensor.lux if IS_PI else 350.0
     motion_now = GPIO.input(PIR_PIN) == 1 if IS_PI else False
     
-    # Uppdatera last_motion_at om vi ser en fågel nu
     global last_motion_at
     if motion_now:
         from datetime import datetime
         last_motion_at = datetime.now().isoformat()
 
-    # Denna JSON matchar nu både Diagnostics-vyn och Dashboarden
     return jsonify({
         "ok": True,
         "isPi": IS_PI,
         "deviceOnline": True,
         "stateFileExists": STATE_FILE.exists(),
         "temperature": 22.0,
-        "curtainState": curtain_state,  # Skicka siffran (t.ex. 100) istället för "open"
+        "curtainState": curtain_state, 
         "birdStatus": get_bird_status(motion_now),
         "lastMotionAt": last_motion_at,
         "light": round(lux, 2),
         "tempSensor": "ok" if IS_PI else "mock",
-        "motorControl": "OK" if IS_PI else "mock"
+        "motorControl": "OK" if IS_PI else "mock",
+        # --- NYA FÄLT HÄR ---
+        "lightOn": light_state,
+        "isMoving": is_moving
     })
 
 @app.route('/curtain/open', methods=['POST'])
@@ -211,6 +228,19 @@ def curtain_close():
     
     threading.Thread(target=flytta_gardin_gradvis, args=(0,)).start()
     return jsonify({"ok": True, "curtainState": curtain_state})
+
+@app.route('/light/toggle', methods=['POST'])
+def light_toggle():
+    global light_state
+    light_state = not light_state
+    
+    # Kör faden i bakgrunden
+    threading.Thread(target=light.set_light, args=(light_state,)).start()
+    
+    return jsonify({
+        "ok": True, 
+        "lightOn": light_state
+    })
 
 @app.route('/camera/snapshot', methods=['GET'])
 def camera_snapshot():

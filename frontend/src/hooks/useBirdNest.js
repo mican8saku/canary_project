@@ -6,6 +6,8 @@ import {
 } from "../api/birdNestApi";
 
 const POLL_INTERVAL_MS = 2_000;
+const [lightOn, setLightOn] = useState(false);
+const [isMoving, setIsMoving] = useState(false);
 
 function formatLastMotion(isoString) {
   if (!isoString) return "Unknown";
@@ -40,6 +42,8 @@ export function useBirdNest() {
 
       setTemperature(status.temperature);
       setCurtainState(status.curtainState);
+      setLightOn(status.lightOn); 
+      setIsMoving(status.isMoving); 
       setBirdStatus(status.birdStatus);
       setLastMotionAt(status.lastMotionAt);
       setDeviceOnline(status.deviceOnline ?? true);
@@ -94,9 +98,23 @@ export function useBirdNest() {
     }
   }, [curtainLoading]);
 
+  const toggleLight = useCallback(async () => {
+  try {
+    const res = await apiPost('/light/toggle'); 
+    if (res && res.ok) {
+      setLightOn(res.lightOn);
+    }
+  } catch (err) {
+    console.error("Kunde inte ändra ljus:", err);
+  }
+  }, []);
+
   return {
     temperature,
     curtainState,
+    lightOn,
+    isMoving,
+    toggleLight,
     birdStatus,
     lastMotionAt: formatLastMotion(lastMotionAt),
     lastMotionAtRaw: lastMotionAt,
