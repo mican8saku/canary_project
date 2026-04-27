@@ -23,6 +23,7 @@ UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 # --- APP STATE (Minne vid omstart) ---
 curtain_state = 0  # 0 = stängd, 100 = öppen
+is_moving = False
 last_motion_at = datetime.now(timezone.utc).isoformat()
 MOTION_IDLE_THRESHOLD = 30 # Sekunder innan fågeln räknas som inaktiv
 
@@ -81,28 +82,6 @@ except Exception as e:
     IS_PI = False
     print(f"--- Running on PC (Mock Mode) --- Error: {e}")
 
-def button_control_thread():
-    global curtain_state
-    print("Knapp-kontroll startad.")
-    while True:
-        if not IS_PI or is_moving: # Om API:et kör motorn, låt knapparna vänta
-            time.sleep(0.1)
-            continue
-            
-        up = GPIO.input(BUTTON_UP) == GPIO.LOW
-        down = GPIO.input(BUTTON_DOWN) == GPIO.LOW
-
-        if up and curtain_state < 100:
-            motor.kor_gardin(0.05, -1)
-            curtain_state = min(100, curtain_state + 2)
-            save_state()
-        elif down and curtain_state > 0:
-            motor.kor_gardin(0.05, 1)
-            curtain_state = max(0, curtain_state - 2)
-            save_state()
-        
-        time.sleep(0.05)
-
 def flytta_gardin_gradvis(target_percent):
     global curtain_state, is_moving
     is_moving = True
@@ -131,6 +110,28 @@ def flytta_gardin_gradvis(target_percent):
             print(f"API Flytt: {curtain_state}%")
     finally:
         is_moving = False
+
+def button_control_thread():
+    global curtain_state, is_moving
+    print("Knapp-kontroll startad.")
+    while True:
+        if not IS_PI or is_moving: # Om API:et kör motorn, låt knapparna vänta
+            time.sleep(0.1)
+            continue
+            
+        up = GPIO.input(BUTTON_UP) == GPIO.LOW
+        down = GPIO.input(BUTTON_DOWN) == GPIO.LOW
+
+        if up and curtain_state < 100:
+            motor.kor_gardin(0.05, -1)
+            curtain_state = min(100, curtain_state + 2)
+            save_state()
+        elif down and curtain_state > 0:
+            motor.kor_gardin(0.05, 1)
+            curtain_state = max(0, curtain_state - 2)
+            save_state()
+        
+        time.sleep(0.05)
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
