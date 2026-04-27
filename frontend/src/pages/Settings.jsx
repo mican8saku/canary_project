@@ -44,7 +44,8 @@ export default function Settings() {
   useEffect(() => {
     setDiagLoading(true);
     getDiagnostics()
-      .then((data) => {
+    .then((data) => {
+        console.log("API Response:", data);
         if(data && data.ok) {
           setDiag(data);
         }
