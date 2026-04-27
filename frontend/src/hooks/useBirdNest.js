@@ -3,6 +3,7 @@ import {
   getSystemStatus,
   openCurtain as apiOpen,
   closeCurtain as apiClose,
+  apiPost
 } from "../api/birdNestApi";
 
 const POLL_INTERVAL_MS = 2_000;
@@ -28,6 +29,8 @@ export function useBirdNest() {
   const [error, setError] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [curtainLoading, setCurtainLoading] = useState(false);
+  const [lightOn, setLightOn] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
 
   const dismissAlert = useCallback((id) => {
     setAlerts((prev) => prev.filter((a) => a.id !== id));
@@ -40,6 +43,8 @@ export function useBirdNest() {
 
       setTemperature(status.temperature);
       setCurtainState(status.curtainState);
+      setLightOn(status.lightOn); 
+      setIsMoving(status.isMoving); 
       setBirdStatus(status.birdStatus);
       setLastMotionAt(status.lastMotionAt);
       setDeviceOnline(status.deviceOnline ?? true);
@@ -94,9 +99,24 @@ export function useBirdNest() {
     }
   }, [curtainLoading]);
 
+  // ---- Light Control ------ 
+  const toggleLight = useCallback(async () => {
+  try {
+    const res = await apiPost('/light/toggle'); 
+    if (res && res.lightOn !== undefined) {
+      setLightOn(res.lightOn);
+    }
+  } catch (err) {
+    console.error("Kunde inte ändra ljus:", err);
+  }
+}, []); // Tom array är ok här om du inte använder lightOn-variabeln inuti try-blocket
+
   return {
     temperature,
     curtainState,
+    lightOn,
+    isMoving,
+    toggleLight,
     birdStatus,
     lastMotionAt: formatLastMotion(lastMotionAt),
     lastMotionAtRaw: lastMotionAt,
