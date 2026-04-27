@@ -6,8 +6,6 @@ import {
 } from "../api/birdNestApi";
 
 const POLL_INTERVAL_MS = 2_000;
-const [lightOn, setLightOn] = useState(false);
-const [isMoving, setIsMoving] = useState(false);
 
 function formatLastMotion(isoString) {
   if (!isoString) return "Unknown";
@@ -30,6 +28,8 @@ export function useBirdNest() {
   const [error, setError] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [curtainLoading, setCurtainLoading] = useState(false);
+  const [lightOn, setLightOn] = useState(false);
+  const [isMoving, setIsMoving] = useState(false);
 
   const dismissAlert = useCallback((id) => {
     setAlerts((prev) => prev.filter((a) => a.id !== id));
