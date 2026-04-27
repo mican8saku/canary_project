@@ -113,25 +113,40 @@ def flytta_gardin_gradvis(target_percent):
 
 def button_control_thread():
     global curtain_state, is_moving
-    print("Knapp-kontroll startad.")
+    print("Knapp-kontroll startad (Mjuk med stopp-skydd).")
+    
+    needs_saving = False 
+    
     while True:
-        if not IS_PI or is_moving: # Om API:et kör motorn, låt knapparna vänta
+        if not IS_PI or is_moving:
             time.sleep(0.1)
             continue
             
-        up = GPIO.input(BUTTON_UP) == GPIO.LOW
-        down = GPIO.input(BUTTON_DOWN) == GPIO.LOW
+        up_pressed = GPIO.input(BUTTON_UP) == GPIO.LOW
+        down_pressed = GPIO.input(BUTTON_DOWN) == GPIO.LOW
 
-        if up and curtain_state < 100:
+        if up_pressed and curtain_state < 100:
+            # Vi kör 0.05 varv (~1.8%)
             motor.kor_gardin(0.05, -1)
+            # Vi ökar med 2% men ser till att aldrig gå över 100
             curtain_state = min(100, curtain_state + 2)
-            save_state()
-        elif down and curtain_state > 0:
+            needs_saving = True
+            
+        elif down_pressed and curtain_state > 0:
             motor.kor_gardin(0.05, 1)
+            # Vi minskar med 2% men ser till att aldrig gå under 0
             curtain_state = max(0, curtain_state - 2)
-            save_state()
+            needs_saving = True
         
-        time.sleep(0.05)
+        else:
+            if needs_saving:
+                save_state()
+                print(f"Position låst vid: {curtain_state}%")
+                needs_saving = False
+            
+            # Lite längre vila här (0.05) för att ge processorn andrum 
+            # och undvika att den "dubbel-läser" precis i slutet
+            time.sleep(0.05)
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
