@@ -82,71 +82,55 @@ except Exception as e:
     print(f"--- Running on PC (Mock Mode) --- Error: {e}")
 
 def button_control_thread():
-    """Bakgrundstråd som lyssnar på fysiska knappar"""
     global curtain_state
-    print("Knapp-kontroll startad i bakgrunden.")
-    
+    print("Knapp-kontroll startad.")
     while True:
-        if not IS_PI:
-            time.sleep(1)
+        if not IS_PI or is_moving: # Om API:et kör motorn, låt knapparna vänta
+            time.sleep(0.1)
             continue
             
-        up_pressed = GPIO.input(BUTTON_UP) == GPIO.LOW
-        down_pressed = GPIO.input(BUTTON_DOWN) == GPIO.LOW
+        up = GPIO.input(BUTTON_UP) == GPIO.LOW
+        down = GPIO.input(BUTTON_DOWN) == GPIO.LOW
 
-        if up_pressed and curtain_state < 100:
-            # Kör en liten bit upp (0.05 sekunder motsvarar ca 1-2% rörelse)
+        if up and curtain_state < 100:
             motor.kor_gardin(0.05, -1)
-            curtain_state = min(100, curtain_state + 2) # Uppskattad ökning
+            curtain_state = min(100, curtain_state + 2)
             save_state()
-            
-        elif down_pressed and curtain_state > 0:
-            # Kör en liten bit ner
+        elif down and curtain_state > 0:
             motor.kor_gardin(0.05, 1)
             curtain_state = max(0, curtain_state - 2)
             save_state()
         
-        else:
-            # Ingen knapp tryckt
-            time.sleep(0.05)
-
-# I main.py
+        time.sleep(0.05)
 
 def flytta_gardin_gradvis(target_percent):
-    global curtain_state
+    global curtain_state, is_moving
+    is_moving = True
     
-    # Mappa dina riktningar: 
-    # Enligt din tidigare kod: Open = -1, Close = 1
+    # Bestäm riktning baserat på din motor-logik
+    # Om vi ska till 100% (öppna), kör riktning -1
     direction = -1 if target_percent > curtain_state else 1
     
-    print(f"Rör gardin från {curtain_state}% till {target_percent}%")
-
-    while curtain_state != target_percent:
-        # Beräkna hur många procent vi ska flytta i detta steg
-        diff = abs(target_percent - curtain_state)
-        step_percent = min(5, diff) # Max 5% per uppdatering för UI:t
-        
-        # Räkna ut varv: (2.8 varv totalt / 100) * antal procent
-        varv_att_kora = (2.8 / 100) * step_percent
-        
-        if IS_PI:
-            # Anropa din motor-funktion
-            # Den kommer köra i ca 0.2 sekunder (204 steg * 0.0010s)
-            motor.kor_gardin(varv_att_kora, direction)
-        else:
-            time.sleep(0.1) # Demo på PC
-
-        # Uppdatera variabeln
-        if direction == -1: # Öppnar (ökar %)
-            curtain_state = min(100, curtain_state + step_percent)
-        else: # Stänger (minskar %)
-            curtain_state = max(0, curtain_state - step_percent)
+    try:
+        while curtain_state != target_percent:
+            # Om någon fysisk knapp trycks in kan vi välja att avbryta här
+            # men vi börjar med att köra 5% steg
+            diff = abs(target_percent - curtain_state)
+            step = min(5, diff)
             
-        # SPARA TILL FIL - Detta gör att appen ser rörelsen i realtid!
-        save_state()
-        print(f"Position: {curtain_state}%")
-
-    print("Rörelse klar.")
+            varv = (2.8 / 100) * step
+            if IS_PI:
+                motor.kor_gardin(varv, direction)
+            
+            if direction == -1:
+                curtain_state = min(100, curtain_state + step)
+            else:
+                curtain_state = max(0, curtain_state - step)
+            
+            save_state()
+            print(f"API Flytt: {curtain_state}%")
+    finally:
+        is_moving = False
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
@@ -194,21 +178,20 @@ def status():
 
 @app.route('/curtain/open', methods=['POST'])
 def curtain_open():
-    global curtain_state
-    if IS_PI:
-        motor.kor_gardin(2.8, -1)
-    curtain_state = 100
-    save_state()
-    return jsonify({"ok": True, "data": {"curtainState": "open"}})
+    if is_moving:
+        return jsonify({"ok": False, "error": "Already moving"}), 400
+    
+    # Starta en engångs-tråd för denna specifika körning
+    threading.Thread(target=flytta_gardin_gradvis, args=(100,)).start()
+    return jsonify({"ok": True, "curtainState": curtain_state})
 
 @app.route('/curtain/close', methods=['POST'])
 def curtain_close():
-    global curtain_state
-    if IS_PI:
-        motor.kor_gardin(2.8, 1)
-    curtain_state = 0
-    save_state()
-    return jsonify({"ok": True, "data": {"curtainState": "closed"}})
+    if is_moving:
+        return jsonify({"ok": False, "error": "Already moving"}), 400
+    
+    threading.Thread(target=flytta_gardin_gradvis, args=(0,)).start()
+    return jsonify({"ok": True, "curtainState": curtain_state})
 
 @app.route('/camera/snapshot', methods=['GET'])
 def camera_snapshot():
