@@ -3,10 +3,14 @@ import io
 import time
 import json
 import subprocess
+import threading
 from pathlib import Path
 from datetime import datetime, timezone
 from flask import Flask, jsonify, send_file, request, Response
 from flask_cors import CORS
+from pathlib import Path
+BASE_DIR = Path(__file__).parent.absolute()
+STATE_FILE = BASE_DIR / "state.json"
 
 app = Flask(__name__)
 # Krävs för att hans Base44-app ska kunna prata med din Pi
@@ -40,7 +44,8 @@ def load_state():
                 data = json.load(f)
                 curtain_state = data.get("curtainState", 0)
                 last_motion_at = data.get("lastMotionAt", last_motion_at)
-        except: pass
+        except Exception as e:
+            print(f"Error loading state: {e}")
 
 load_state()
 
@@ -58,9 +63,13 @@ try:
     
     PIR_PIN = 6
     LED_PIN = 18
+    BUTTON_UP = 16
+    BUTTON_DOWN = 20
     
     GPIO.setup(PIR_PIN, GPIO.IN)
     GPIO.setup(LED_PIN, GPIO.OUT)
+    GPIO.setup(BUTTON_UP, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(BUTTON_DOWN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
     dht_device = adafruit_dht.DHT11(board.D25)
     i2c = board.I2C()
@@ -71,6 +80,35 @@ try:
 except Exception as e:
     IS_PI = False
     print(f"--- Running on PC (Mock Mode) --- Error: {e}")
+
+def button_control_thread():
+    """Bakgrundstråd som lyssnar på fysiska knappar"""
+    global curtain_state
+    print("Knapp-kontroll startad i bakgrunden.")
+    
+    while True:
+        if not IS_PI:
+            time.sleep(1)
+            continue
+            
+        up_pressed = GPIO.input(BUTTON_UP) == GPIO.LOW
+        down_pressed = GPIO.input(BUTTON_DOWN) == GPIO.LOW
+
+        if up_pressed and curtain_state < 100:
+            # Kör en liten bit upp (0.05 sekunder motsvarar ca 1-2% rörelse)
+            motor.kor_gardin(0.05, -1)
+            curtain_state = min(100, curtain_state + 2) # Uppskattad ökning
+            save_state()
+            
+        elif down_pressed and curtain_state > 0:
+            # Kör en liten bit ner
+            motor.kor_gardin(0.05, 1)
+            curtain_state = max(0, curtain_state - 2)
+            save_state()
+        
+        else:
+            # Ingen knapp tryckt
+            time.sleep(0.05)
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
@@ -91,24 +129,29 @@ def get_bird_status(motion_now):
 
 @app.route('/status', methods=['GET'])
 def status():
-    """Huvudstatus för appen"""
+    """Huvudstatus som servar både Dashboard och Diagnostics"""
     lux = tsl_sensor.lux if IS_PI else 350.0
     motion_now = GPIO.input(PIR_PIN) == 1 if IS_PI else False
     
-    # Mockad temperatur tills DHT11 är 100% stabil
-    temp = 22.0 
-    
+    # Uppdatera last_motion_at om vi ser en fågel nu
+    global last_motion_at
+    if motion_now:
+        from datetime import datetime
+        last_motion_at = datetime.now().isoformat()
+
+    # Denna JSON matchar nu både Diagnostics-vyn och Dashboarden
     return jsonify({
         "ok": True,
-        "data": {
-            "deviceOnline": True,
-            "isPi": IS_PI,
-            "temperature": temp,
-            "curtainState": get_curtain_str(),
-            "birdStatus": get_bird_status(motion_now),
-            "lastMotionAt": last_motion_at,
-            "light": round(lux, 2)
-        }
+        "isPi": IS_PI,
+        "deviceOnline": True,
+        "stateFileExists": STATE_FILE.exists(),
+        "temperature": 22.0,
+        "curtainState": curtain_state,  # Skicka siffran (t.ex. 100) istället för "open"
+        "birdStatus": get_bird_status(motion_now),
+        "lastMotionAt": last_motion_at,
+        "light": round(lux, 2),
+        "tempSensor": "ok" if IS_PI else "mock",
+        "motorControl": "OK" if IS_PI else "mock"
     })
 
 @app.route('/curtain/open', methods=['POST'])
@@ -212,8 +255,13 @@ def camera_stream():
 # --- STARTA SERVER ---
 if __name__ == '__main__':
     try:
+
+        # Starta tråden som "daemon" så den dör när huvudprogrammet dör
+        t = threading.Thread(target=button_control_thread, daemon=True)
+        t.start()
+
         # Körs på port 5000 för att matcha hans frontend-anrop
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        app.run(host='0.0.0.0', port=5000, debug=False)
     finally:
         if IS_PI:
             GPIO.cleanup()
