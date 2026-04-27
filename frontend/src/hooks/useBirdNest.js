@@ -5,7 +5,7 @@ import {
   closeCurtain as apiClose,
 } from "../api/birdNestApi";
 
-const POLL_INTERVAL_MS = 5_000;
+const POLL_INTERVAL_MS = 2_000;
 
 function formatLastMotion(isoString) {
   if (!isoString) return "Unknown";
