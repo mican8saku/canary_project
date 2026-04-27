@@ -66,11 +66,14 @@ try:
     LED_PIN = 18
     BUTTON_UP = 16
     BUTTON_DOWN = 20
+    LEDSTRIP_BUTTON = 21
     
     GPIO.setup(PIR_PIN, GPIO.IN)
     GPIO.setup(LED_PIN, GPIO.OUT)
+    GPIO.setup(LEDSTRIP_PIN, GPIO.OUT)
     GPIO.setup(BUTTON_UP, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(BUTTON_DOWN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+    GPIO.setup(LEDSTRIP_BUTTON, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
     dht_device = adafruit_dht.DHT11(board.D25)
     i2c = board.I2C()
