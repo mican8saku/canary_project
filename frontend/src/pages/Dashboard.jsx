@@ -3,7 +3,6 @@ import { Blinds, Lightbulb } from "lucide-react";
 import FeaturedCurtainCard from "../components/FeaturedCurtainCard";
 import LightControlCard from "../components/LightControlCard"; 
 import { useBirdNest } from "../hooks/useBirdNest";
-import LightControlCard from "../components/LightControlCard";
 
 export default function Dashboard() {
   const { 
