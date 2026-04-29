@@ -89,7 +89,7 @@ try:
     GPIO.setmode(GPIO.BCM)
     GPIO.setwarnings(False)
     
-    PIR_PIN = 6
+    PIR_PIN = 14
     LED_PIN = 18
     BUTTON_UP = 16
     BUTTON_DOWN = 20
@@ -203,6 +203,18 @@ def automation_routine_thread():
 
     while True:
         try:
+
+            # Inuti while True:
+            motion_now = GPIO.input(PIR_PIN) == 1 if IS_PI else False
+            if motion_now:
+            # 1. För logiken (sekunder)
+                last_motion_time = time.time() 
+                # 2. För API/Frontend (klockslag)
+                last_motion_at = datetime.now().isoformat()
+                # 3. Tänd debug-lampan (PIN 18)
+                if IS_PI: GPIO.output(18, GPIO.HIGH)
+            else:
+                if IS_PI: GPIO.output(18, GPIO.LOW)
             nu = datetime.now()
             current_time_ts = time.time()
             
@@ -280,7 +292,7 @@ def automation_routine_thread():
         except Exception as e:
             print(f"Automation error: {e}")
         
-        time.sleep(1)
+        time.sleep(0.4)
 
 def start_curtain_thread(target, reason):
     """Hjälpfunktion för att starta gradvis flytt i en egen tråd"""
