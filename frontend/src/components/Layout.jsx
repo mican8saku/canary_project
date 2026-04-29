@@ -1,10 +1,10 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { Home, Blinds, Camera, Settings } from "lucide-react";
+import { Home, SlidersHorizontal, Camera, Settings } from "lucide-react";
 import { motion } from "framer-motion";
 
 const navItems = [
   { path: "/",          label: "Home",     icon: Home },
-  { path: "/dashboard", label: "Curtains", icon: Blinds },
+  { path: "/dashboard", label: "Controls", icon: SlidersHorizontal },
   { path: "/camera",    label: "Camera",   icon: Camera },
   { path: "/settings",  label: "Settings", icon: Settings },
 ];

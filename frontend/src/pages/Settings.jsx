@@ -147,7 +147,7 @@ export default function Settings() {
                       type="time" 
                       value={autoSettings.time_up}
                       onChange={(e) => updateAutoSetting("time_up", e.target.value)}
-                      className="bg-transparent text-sm font-bold w-[65px] outline-none text-foreground cursor-pointer"
+                      className="bg-transparent text-sm font-bold w-[80px] outline-none text-foreground cursor-pointer"
                     />
                   </div>
                   <span className="text-muted-foreground/30 font-light">|</span>
@@ -157,7 +157,7 @@ export default function Settings() {
                       type="time" 
                       value={autoSettings.time_down}
                       onChange={(e) => updateAutoSetting("time_down", e.target.value)}
-                      className="bg-transparent text-sm font-bold w-[65px] outline-none text-foreground cursor-pointer"
+                      className="bg-transparent text-sm font-bold w-[80px] outline-none text-foreground cursor-pointer"
                     />
                   </div>
                 </div>
@@ -183,7 +183,7 @@ export default function Settings() {
             <div className="pl-12 pr-6 py-4 bg-muted/5 border-t border-border/40 flex items-center justify-between">
               <div className="flex flex-col">
                 <span className="text-sm font-medium text-foreground">Lux Threshold</span>
-                <span className="text-[10px] text-muted-foreground italic">Lower = triggers when darker</span>
+                <span className="text-[10px] text-muted-foreground">Lower = triggers when darker</span>
               </div>
               <div className="flex items-center gap-2 bg-background px-3 py-1.5 rounded-lg border border-border/50 shadow-sm border-black">
                  <input 
@@ -192,7 +192,7 @@ export default function Settings() {
                   onChange={(e) => updateAutoSetting("lux_threshold", parseInt(e.target.value) || 0)}
                   className="bg-transparent text-sm font-bold w-12 text-center outline-none text-black"
                 />
-                <span className="text-[10px] font-bold text-black uppercase">LX</span>
+                <span className="text-[20px] font-bold text-black uppercase">LX</span>
               </div>
             </div>
           </div>
