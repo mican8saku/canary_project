@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Blinds, Camera, Thermometer, Bird, Activity } from "lucide-react";
+import { Blinds, Camera, Thermometer, Bird, Activity, Sun } from "lucide-react";
 import AlertBanner from "../components/AlertBanner";
 import { useBirdNest } from "../hooks/useBirdNest";
 import { WifiOff } from "lucide-react";
