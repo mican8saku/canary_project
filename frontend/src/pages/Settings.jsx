@@ -64,8 +64,6 @@ useEffect(() => {
       if (data?.ok && data.settings) setAutoSettings(data.settings);
     });
 }, [isSaving]); // Körs när isSaving ändras
-// Lägg till en state för att veta om vi sparar just nu
-const [isSaving, setIsSaving] = useState(false);
 
 const updateAutoSetting = async (key, value) => {
   // 1. Uppdatera UI direkt (Optimistiskt)
