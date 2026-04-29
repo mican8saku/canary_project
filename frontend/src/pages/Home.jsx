@@ -130,7 +130,7 @@ export default function Home() {
               <span className="absolute top-3 right-3 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
                 Smart
               </span>
-              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mb-3 shadow-sm">
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-3 shadow-sm">
                 <Sun className="h-5 w-5 text-white" />
               </div>
               <p className="text-sm font-bold text-foreground">Lights</p>
