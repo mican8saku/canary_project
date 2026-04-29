@@ -143,11 +143,11 @@ export default function Settings() {
                 <div className="flex items-center gap-2">
                   <Sunrise className="h-3.5 w-3.5 text-orange-400" />
                   <input 
-                    type="time" 
+                    type="text" 
                     step="60" // Tvingar ofta webbläsaren att hålla sig till renare format
                     value={autoSettings.time_up}
                     onChange={(e) => updateAutoSetting("time_up", e.target.value)}
-                    className="bg-transparent text-sm font-bold w-[60px] outline-none text-foreground cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
+                    className="bg-transparent text-sm font-bold w-[90px] outline-none text-foreground cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
                     style={{ border: 'none', padding: 0 }}
                   />
                 </div>
@@ -155,11 +155,11 @@ export default function Settings() {
                 <div className="flex items-center gap-2">
                   <Sunset className="h-3.5 w-3.5 text-blue-400" />
                   <input 
-                    type="time" 
+                    type="text" 
                     step="60"
                     value={autoSettings.time_down}
                     onChange={(e) => updateAutoSetting("time_down", e.target.value)}
-                    className="bg-transparent text-sm font-bold w-[60px] outline-none text-foreground cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
+                    className="bg-transparent text-sm font-bold w-[90px] outline-none text-foreground cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
                     style={{ border: 'none', padding: 0 }}
                   />
                 </div>
