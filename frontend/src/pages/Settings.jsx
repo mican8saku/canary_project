@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { 
   Bell, Thermometer, Clock, Cpu, Activity, 
   HardDrive, Blinds, Bird, Loader2, AlertCircle, 
-  CheckCircle2, XCircle, Sun // Lade till Sun här
+  CheckCircle2, XCircle, Sun, Sunrise, Sunset // Lade till Sunrise/Sunset
 } from "lucide-react";
 import SettingRow from "../components/SettingRow";
 import { getDiagnostics, apiPost } from "../api/birdNestApi";
@@ -15,10 +15,7 @@ function DiagRow({ icon: Icon, label, value, status }) {
     status === "error" ? "text-destructive" :
     "text-muted-foreground";
 
-  const Dot =
-    status === "ok" ? CheckCircle2 :
-    status === "error" ? XCircle :
-    null;
+  const Dot = status === "ok" ? CheckCircle2 : status === "error" ? XCircle : null;
 
   return (
     <div className="flex items-center justify-between py-3.5 first:pt-0 last:pb-0 border-b border-border/50 last:border-0">
@@ -52,7 +49,6 @@ export default function Settings() {
     time_down: "21:30"
   });
 
-  // 1. Hämta Diagnostik
   useEffect(() => {
     setDiagLoading(true);
     getDiagnostics()
@@ -64,18 +60,14 @@ export default function Settings() {
       .finally(() => setDiagLoading(false));
   }, []);
 
-  // 2. Hämta Inställningar
   useEffect(() => {
     apiPost('/settings/automation', {}, 'GET')
       .then(data => {
-        if (data && data.ok && data.settings) {
-          setAutoSettings(data.settings);
-        }
+        if (data && data.ok && data.settings) setAutoSettings(data.settings);
       })
       .catch(err => console.error("Could not fetch automation settings", err));
   }, []);
 
-  // 3. Spara Inställning
   const updateAutoSetting = async (key, value) => {
     setAutoSettings(prev => ({ ...prev, [key]: value }));
     try {
@@ -85,13 +77,10 @@ export default function Settings() {
     }
   };
 
-  const isOnline = diag != null;
   const isPi = diag?.isPi ?? false;
-
   const lastMotionLabel = (() => {
     if (!diag?.lastMotionAt) return "Unknown";
     const secondsAgo = Math.floor((Date.now() - new Date(diag.lastMotionAt).getTime()) / 1000);
-    if (secondsAgo < 10) return "Just now";
     if (secondsAgo < 60) return `${secondsAgo}s ago`;
     return `${Math.floor(secondsAgo / 60)}m ago`;
   })();
@@ -99,10 +88,10 @@ export default function Settings() {
   return (
     <div className="px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-8 space-y-6">
       
-      {/* HEADER */}
+      {/* HEADER - Nu vänsterställd igen */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1 text-center">Preferences</p>
-        <h1 className="text-2xl font-bold text-foreground tracking-tight text-center">Settings</h1>
+        <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">Preferences</p>
+        <h1 className="text-2xl font-bold text-foreground tracking-tight">Settings</h1>
       </motion.div>
 
       {/* AUTOMATION CARD */}
@@ -111,13 +100,13 @@ export default function Settings() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.12 }}
       >
-        <h2 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-2.5 ml-1">
+        {/* Rubrik matchar nu Diagnostics exakt */}
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 ml-1">
           Automation Routine
         </h2>
         
         <div className="bg-card rounded-3xl border border-border/60 shadow-sm overflow-hidden">
           
-          {/* CURTAIN MAIN */}
           <div className="px-4">
             <SettingRow
               icon={Blinds}
@@ -129,13 +118,11 @@ export default function Settings() {
             />
           </div>
 
-          {/* CURTAIN SUB-SETTINGS */}
-          <div className={`transition-all duration-500 ease-in-out ${
-            !autoSettings.curtain_routine_active 
-              ? "opacity-30 grayscale pointer-events-none max-h-0 overflow-hidden" 
-              : "opacity-100 max-h-[500px] bg-muted/10 border-t border-border/40"
+          {/* Undermeny - Försvinner inte längre, blir bara grå via CSS klasser */}
+          <div className={`transition-all duration-300 ${
+            !autoSettings.curtain_routine_active ? "opacity-30 grayscale pointer-events-none" : "opacity-100"
           }`}>
-            <div className="pl-10 pr-4 pb-2 divide-y divide-border/40">
+            <div className="pl-10 pr-4 pb-2 divide-y divide-border/40 bg-muted/5 border-t border-border/40">
               <SettingRow
                 icon={Activity}
                 label="Biorythm (PIR)"
@@ -151,26 +138,33 @@ export default function Settings() {
                   </div>
                   <span className="text-sm font-medium text-foreground">Active Window</span>
                 </div>
-                <div className="flex items-center gap-2 bg-background px-3 py-2 rounded-xl border border-border/50 shadow-inner">
-                  <input 
-                    type="time" 
-                    value={autoSettings.time_up}
-                    onChange={(e) => updateAutoSetting("time_up", e.target.value)}
-                    className="bg-transparent text-sm font-bold w-[70px] outline-none text-foreground cursor-pointer"
-                  />
-                  <span className="text-muted-foreground/40 font-light">|</span>
-                  <input 
-                    type="time" 
-                    value={autoSettings.time_down}
-                    onChange={(e) => updateAutoSetting("time_down", e.target.value)}
-                    className="bg-transparent text-sm font-bold w-[70px] outline-none text-foreground cursor-pointer"
-                  />
+                
+                {/* Bredare input-ruta med Sunrise/Sunset ikoner */}
+                <div className="flex items-center gap-3 bg-background px-4 py-2.5 rounded-xl border border-border/50 shadow-inner min-w-[200px] justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sunrise className="h-3.5 w-3.5 text-orange-400" />
+                    <input 
+                      type="time" 
+                      value={autoSettings.time_up}
+                      onChange={(e) => updateAutoSetting("time_up", e.target.value)}
+                      className="bg-transparent text-sm font-bold w-[65px] outline-none text-foreground cursor-pointer"
+                    />
+                  </div>
+                  <span className="text-muted-foreground/30 font-light">|</span>
+                  <div className="flex items-center gap-2">
+                    <Sunset className="h-3.5 w-3.5 text-blue-400" />
+                    <input 
+                      type="time" 
+                      value={autoSettings.time_down}
+                      onChange={(e) => updateAutoSetting("time_down", e.target.value)}
+                      className="bg-transparent text-sm font-bold w-[65px] outline-none text-foreground cursor-pointer"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* LIGHTING MAIN */}
           <div className="px-4 border-t border-border/50">
             <SettingRow
               icon={Sun}
@@ -182,28 +176,24 @@ export default function Settings() {
             />
           </div>
 
-          {/* LUX SLIDER */}
-          <div className={`transition-all duration-500 ease-in-out ${
-            !autoSettings.led_routine_active 
-              ? "opacity-30 grayscale pointer-events-none max-h-0 overflow-hidden" 
-              : "opacity-100 max-h-[500px] bg-muted/10 border-t border-border/40"
+          {/* Lux-inställning - Nu med TextBox och svart text */}
+          <div className={`transition-all duration-300 ${
+            !autoSettings.led_routine_active ? "opacity-30 grayscale pointer-events-none" : "opacity-100"
           }`}>
-            <div className="pl-12 pr-6 py-5">
-              <div className="flex justify-between items-end mb-3">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">Sensitivity</span>
-                  <span className="text-[10px] text-muted-foreground/60 italic">Lower = triggers in darker conditions</span>
-                </div>
-                <span className="text-sm font-black text-primary bg-primary/10 px-2 py-0.5 rounded-md">
-                  {autoSettings.lux_threshold} <span className="text-[10px] font-medium tracking-normal">LX</span>
-                </span>
+            <div className="pl-12 pr-6 py-4 bg-muted/5 border-t border-border/40 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">Lux Threshold</span>
+                <span className="text-[10px] text-muted-foreground italic">Lower = triggers when darker</span>
               </div>
-              <input 
-                type="range" min="5" max="150" step="5"
-                value={autoSettings.lux_threshold}
-                onChange={(e) => updateAutoSetting("lux_threshold", parseInt(e.target.value))}
-                className="w-full h-1.5 bg-border rounded-full appearance-none cursor-pointer accent-primary"
-              />
+              <div className="flex items-center gap-2 bg-background px-3 py-1.5 rounded-lg border border-border/50 shadow-sm border-black">
+                 <input 
+                  type="number"
+                  value={autoSettings.lux_threshold}
+                  onChange={(e) => updateAutoSetting("lux_threshold", parseInt(e.target.value) || 0)}
+                  className="bg-transparent text-sm font-bold w-12 text-center outline-none text-black"
+                />
+                <span className="text-[10px] font-bold text-black uppercase">LX</span>
+              </div>
             </div>
           </div>
         </div>
@@ -222,9 +212,9 @@ export default function Settings() {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : diagError ? (
-            <div className="flex flex-col items-center justify-center py-6 gap-2 text-destructive">
+            <div className="flex flex-col items-center justify-center py-6 gap-2 text-destructive font-medium">
               <AlertCircle className="h-6 w-6" />
-              <p className="text-sm font-medium">Pi is Offline</p>
+              <p className="text-sm">Pi is Offline</p>
             </div>
           ) : (
             <>
@@ -237,7 +227,6 @@ export default function Settings() {
           )}
         </div>
       </motion.div>
-
     </div>
   );
 }
