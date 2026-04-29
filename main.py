@@ -31,15 +31,14 @@ last_motion_at = datetime.now(timezone.utc).isoformat()
 MOTION_IDLE_THRESHOLD = 30 # Sekunder innan fågeln räknas som inaktiv
 
 # --- AUTOMATIONS-SETTINGS ---
-LUX_THRESHOLD = 30.0
+TID_UPP = "08:00"      # Senaste tid för morgonöppning
+TID_NER = "17:30"      # Senaste tid för kvällsstängning
+STILL_MINUTER = 5      # Inaktivitet innan stängning i kvällsfönstret
+LUX_THRESHOLD = 30.0   # Gräns för när LED-strippen ska tändas
+
+# Variabler för att hålla koll på tillstånd
+last_motion_time = time.time()
 auto_light_active = False
-
-# --- TIDSKONFIGURATION ---
-TID_GARDIN_UPP  = "08:00"
-TID_GARDIN_NER  = "20:00"
-
-TID_LUX_START   = "07:30"  # När ljussensorn får börja styra
-TID_LUX_END     = "19:00"  # När ljussensorn slutar styra för dagen
 
 def save_state():
     try:
@@ -100,7 +99,7 @@ except Exception as e:
     IS_PI = False
     print(f"--- Running on PC (Mock Mode) --- Error: {e}")
 
-def flytta_gardin_gradvis(target_percent):
+def move_curtain_gradually(target_percent):
     global curtain_state, is_moving
     is_moving = True
     
@@ -181,36 +180,83 @@ def button_control_thread():
             time.sleep(0.05)
 
 def automation_routine_thread():
-    """Tråd som sköter automatiska rutiner (ljussensorn)"""
-    global auto_light_active
+    """Huvudrutin för fågelns biorytm: Gardiner (PIR + Tid) och Ljus (Lux + Tid)"""
+    global last_motion_time, auto_light_active, curtain_state, is_moving
     
-    # Om vi inte ar pa en Pi, avsluta traden direkt
     if not IS_PI:
-        print("Automation: Mock mode - traden avslutas")
+        print("Automation: Mock mode - thread exiting")
         return
 
-    print("Automation: Routine thread started")
+    print(f"Automation: Biorythm active. Window: {TID_UPP} - {TID_NER}")
+
+    # Schemalägg fasta tider som backup (använder dina gradvisa funktioner)
+    schedule.every().day.at(TID_UPP).do(lambda: start_curtain_thread(100, "Fixed morning time"))
+    schedule.every().day.at(TID_NER).do(lambda: start_curtain_thread(0, "Fixed evening time"))
 
     while True:
         try:
-            # Vi använder tsl_sensor som skapades i din setup
-            lux = tsl_sensor.lux
+            nu = datetime.now()
+            schedule.run_pending()
+
+            # --- 1. BERÄKNA TIDSFÖNSTER ---
+            # Skapa datetime-objekt för dagens tider
+            upp_obj = datetime.strptime(TID_UPP, "%H:%M").replace(year=nu.year, month=nu.month, day=nu.day)
+            ner_obj = datetime.strptime(TID_NER, "%H:%M").replace(year=nu.year, month=nu.month, day=nu.day)
             
-            if lux < LUX_THRESHOLD and not auto_light_active:
-                print(f"Automation: Dark detected ({lux:.2f} lux). Fading in...")
-                light.set_light(True)
-                auto_light_active = True
-                
-            elif lux >= LUX_THRESHOLD and auto_light_active:
-                print(f"Automation: Light detected ({lux:.2f} lux). Fading out...")
-                light.set_light(False)
-                auto_light_active = False
+            morgon_start = upp_obj - timedelta(hours=1)
+            kvall_start = ner_obj - timedelta(hours=1)
+
+            # Läs sensorer
+            rorelse_detekterad = GPIO.input(PIR_PIN)
+            lux = tsl_sensor.lux
+
+            # --- 2. GARDIN-LOGIK (PIR-BASERAD) ---
+            if not is_moving:
+                # MORGON: Om rörelse detekteras 1h innan TID_UPP
+                if morgon_start <= nu <= upp_obj and curtain_state < 100:
+                    if rorelse_detekterad:
+                        print("Automation: Morning motion! Bird is awake. Opening...")
+                        start_curtain_thread(100, "Morning motion")
+
+                # KVÄLL: Om fågeln är stilla i 5 min 1h innan TID_NER
+                elif kvall_start <= nu <= ner_obj and curtain_state > 0:
+                    if rorelse_detekterad:
+                        last_motion_time = time.time() # Nollställ timer
+                    
+                    sekunder_stilla = time.time() - last_motion_time
+                    if sekunder_stilla >= (STILL_MINUTER * 60):
+                        print(f"Automation: Bird still for {STILL_MINUTER} min. Closing early...")
+                        start_curtain_thread(0, "Evening stillness")
+
+            # --- 3. LJUS-LOGIK (LUX + AKTIVT FÖNSTER) ---
+            # Ljussensorn ska bara vara aktiv när gardinen "bör" vara uppe (fågelns dag)
+            if upp_obj <= nu <= ner_obj:
+                if lux < LUX_THRESHOLD and not auto_light_active:
+                    print(f"Automation: Dark in cage ({lux:.2f} lux). Fading in light.")
+                    light.set_light(True)
+                    auto_light_active = True
+                elif lux >= LUX_THRESHOLD and auto_light_active:
+                    print(f"Automation: Sufficient light ({lux:.2f} lux). Fading out.")
+                    light.set_light(False)
+                    auto_light_active = False
+            else:
+                # Nattetid: Tvinga lampan att vara släckt
+                if auto_light_active:
+                    print("Automation: Night time, forcing light off.")
+                    light.set_light(False)
+                    auto_light_active = False
 
         except Exception as e:
-            print(f"Automation error: {e}")
+            print(f"Automation loop error: {e}")
         
-        # 5 sekunders paus for att undvika flimmer vid snabba ljusforandringar
-        time.sleep(5)
+        time.sleep(0.5) # Snabbare loop för att fånga upp rörelse (PIR)
+
+def start_curtain_thread(target, reason):
+    """Hjälpfunktion för att starta gradvis flytt i en egen tråd"""
+    global is_moving
+    if not is_moving:
+        print(f"Trigger: {reason} -> Moving to {target}%")
+        threading.Thread(target=move_curtain_gradually, args=(target,), daemon=True).start()
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
@@ -263,7 +309,7 @@ def curtain_open():
         return jsonify({"ok": False, "error": "Already moving"}), 400
     
     # Starta en engångs-tråd för denna specifika körning
-    threading.Thread(target=flytta_gardin_gradvis, args=(100,)).start()
+    threading.Thread(target=move_curtain_gradually, args=(100,)).start()
     return jsonify({"ok": True, "curtainState": curtain_state})
 
 @app.route('/curtain/close', methods=['POST'])
@@ -271,7 +317,7 @@ def curtain_close():
     if is_moving:
         return jsonify({"ok": False, "error": "Already moving"}), 400
     
-    threading.Thread(target=flytta_gardin_gradvis, args=(0,)).start()
+    threading.Thread(target=move_curtain_gradually, args=(0,)).start()
     return jsonify({"ok": True, "curtainState": curtain_state})
 
 @app.route('/light/toggle', methods=['POST'])
