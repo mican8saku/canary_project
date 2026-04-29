@@ -198,71 +198,60 @@ def automation_routine_thread():
     
     if not IS_PI: return
 
-    # Håll koll på vilka tider som är schemalagda just nu
-    current_scheduled_up = auto_settings["time_up"]
-    current_scheduled_down = auto_settings["time_down"]
-
-    # Initial schemaläggning
-    schedule.every().day.at(current_scheduled_up).do(lambda: start_curtain_thread(100, "Fixed morning time"))
-    schedule.every().day.at(current_scheduled_down).do(lambda: start_curtain_thread(0, "Fixed evening time"))
-
     while True:
         try:
             nu = datetime.now()
             
-            # --- DYNAMISK UPPDATERING AV SCHEMA ---
-            # Om tiderna har ändrats via appen, nollställ och schemalägg på nytt
-            if current_scheduled_up != auto_settings["time_up"] or current_scheduled_down != auto_settings["time_down"]:
-                schedule.clear() # Tömmer gamla tider
-                current_scheduled_up = auto_settings["time_up"]
-                current_scheduled_down = auto_settings["time_down"]
-                schedule.every().day.at(current_scheduled_up).do(lambda: start_curtain_thread(100, "Fixed morning time"))
-                schedule.every().day.at(current_scheduled_down).do(lambda: start_curtain_thread(0, "Fixed evening time"))
-                print(f"Schedule updated: Up at {current_scheduled_up}, Down at {current_scheduled_down}")
-
-            schedule.run_pending()
-
-            # --- BERÄKNA TIDSFÖNSTER BASERAT PÅ SETTINGS ---
-            upp_obj = datetime.strptime(auto_settings["time_up"], "%H:%M").replace(year=nu.year, month=nu.month, day=nu.day)
-            ner_obj = datetime.strptime(auto_settings["time_down"], "%H:%M").replace(year=nu.year, month=nu.month, day=nu.day)
+            # --- BERÄKNA TIDSFÖNSTER ---
+            # Skapa datetime-objekt för dagens tider
+            upp_obj = datetime.strptime(auto_settings["time_up"], "%H:%M").replace(
+                year=nu.year, month=nu.month, day=nu.day)
+            ner_obj = datetime.strptime(auto_settings["time_down"], "%H:%M").replace(
+                year=nu.year, month=nu.month, day=nu.day)
             
-            # Använd window_hours från settings
+            # Beräkna när PIR-logiken ska börja leta efter rörelse (window_hours innan)
             morgon_start = upp_obj - timedelta(hours=auto_settings["window_hours"])
             kvall_start = ner_obj - timedelta(hours=auto_settings["window_hours"])
+
+            # Definiera om vi är "Inom fönstret" (Dag) eller "Utanför" (Natt)
+            # VIKTIGT: ner_obj är den hårda gränsen för när allt ska stängas
+            is_active_window = (upp_obj <= nu < ner_obj)
 
             # --- GARDIN AUTOMATION ---
             if auto_settings["curtain_routine_active"] and not is_moving:
                 motion_detected = GPIO.input(PIR_PIN) == GPIO.HIGH
                 if motion_detected:
-                    last_motion_time = time.time() # Uppdatera alltid vid rörelse
+                    last_motion_time = time.time()
 
-                # 1. ABSOLUT STÄNGNING (Om klockan är efter time_down)
-                # Denna ser till att gardinen går ner direkt om tiden passerat
-                if nu >= ner_obj and curtain_state > 0:
-                    start_curtain_thread(0, "Scheduled closing (Time window passed)")
-
-                # 2. ABSOLUT ÖPPNING (Valfritt: Om klockan är efter time_up och PIR inte används)
-                elif nu >= upp_obj and not auto_settings["use_pir_adjustment"] and curtain_state < 100:
-                    start_curtain_thread(100, "Scheduled opening")
-
-                # 3. BIORYTHM LOGIK (Endast om vi är inom fönstret)
-                elif auto_settings["use_pir_adjustment"]:
-                    
-                    # Morgon-fönster: Öppna vid första rörelse
-                    if morgon_start <= nu <= upp_obj and curtain_state < 100:
-                        if motion_detected:
-                            start_curtain_thread(100, "Morning motion")
-                    
-                    # Kvälls-fönster: Stäng om det varit stilla
-                    elif kvall_start <= nu <= ner_obj and curtain_state > 0:
-                        idle_seconds = time.time() - last_motion_time
-                        if idle_seconds >= (auto_settings["still_minutes"] * 60):
-                            start_curtain_thread(0, "Evening stillness")
+                # FALL 1: Det är NATT (efter ner_obj eller innan upp_obj)
+                if not is_active_window:
+                    if curtain_state > 0:
+                        start_curtain_thread(0, "Night-time safety close")
+                
+                # FALL 2: Det är DAG (inom fönstret)
+                else:
+                    if not auto_settings["use_pir_adjustment"]:
+                        # Biorytm AV -> Gardinen ska bara vara öppen
+                        if curtain_state < 100:
+                            start_curtain_thread(100, "Daytime: Biorythm OFF")
+                    else:
+                        # Biorytm PÅ -> Kör PIR-logik
+                        # Morgonfönstret (innan upp_obj men efter morgon_start)
+                        if morgon_start <= nu <= upp_obj and curtain_state < 100:
+                            if motion_detected:
+                                start_curtain_thread(100, "Morning motion")
+                        
+                        # Kvällsfönstret (innan ner_obj men efter kvall_start)
+                        elif kvall_start <= nu <= ner_obj and curtain_state > 0:
+                            idle_seconds = time.time() - last_motion_time
+                            if idle_seconds >= (auto_settings["still_minutes"] * 60):
+                                start_curtain_thread(0, "Evening stillness")
 
             # --- LED AUTOMATION ---
             if auto_settings["led_routine_active"]:
                 lux = tsl_sensor.lux
-                if upp_obj <= nu <= ner_obj:
+                # LED lyser bara om vi är inom det aktiva tidsfönstret
+                if is_active_window:
                     if lux < auto_settings["lux_threshold"] and not auto_light_active:
                         light.set_light(True)
                         auto_light_active = True
@@ -270,6 +259,7 @@ def automation_routine_thread():
                         light.set_light(False)
                         auto_light_active = False
                 else:
+                    # Alltid av på natten
                     if auto_light_active:
                         light.set_light(False)
                         auto_light_active = False
@@ -277,7 +267,7 @@ def automation_routine_thread():
         except Exception as e:
             print(f"Automation error: {e}")
         
-        time.sleep(0.5)
+        time.sleep(1) # 1 sekund räcker gott för automation
 
 def start_curtain_thread(target, reason):
     """Hjälpfunktion för att starta gradvis flytt i en egen tråd"""
