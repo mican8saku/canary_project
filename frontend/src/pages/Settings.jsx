@@ -110,70 +110,117 @@ export default function Settings() {
         <h1 className="text-2xl font-bold text-foreground tracking-tight">Settings</h1>
       </motion.div>
 
-      {/* Automation Routine Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.12 }}
-        className="mb-6"
-      >
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Automation Routine</h2>
-        <div className="bg-card rounded-2xl border border-border/60 shadow-sm px-4 divide-y divide-border/50">
-          
-          <SettingRow
-            icon={Bird}
-            label="Curtain Automation"
-            description="Auto open/close based on schedule"
-            type="toggle"
-            value={autoSettings.curtain_routine_active}
-            onChange={(val) => updateAutoSetting("curtain_routine_active", val)}
-          />
+      {/* --- AUTOMATION SECTION --- */}
+<motion.div
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.12 }}
+  className="mb-6"
+>
+  <h2 className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.15em] mb-2.5 ml-1">
+    Automation Routine
+  </h2>
+  
+  <div className="bg-card rounded-3xl border border-border/60 shadow-sm overflow-hidden">
+    
+    {/* CURTAIN MAIN TOGGLE */}
+    <div className="px-4">
+      <SettingRow
+        icon={Blinds}
+        label="Curtain Automation"
+        description="Auto-adjust based on bird activity"
+        type="toggle"
+        value={autoSettings.curtain_routine_active}
+        onChange={(val) => updateAutoSetting("curtain_routine_active", val)}
+      />
+    </div>
 
-          {autoSettings.curtain_routine_active && (
-            <>
-              <SettingRow
-                icon={Activity}
-                label="Biorythm (PIR)"
-                description="Adjust timing based on movement (1h window before set scheduele) "
-                type="toggle"
-                value={autoSettings.use_pir_adjustment}
-                onChange={(val) => updateAutoSetting("use_pir_adjustment", val)}
-              />
-              
-              <SettingRow
-                icon={Clock}
-                label="Wake up time"
-                type="value"
-                value={autoSettings.time_up}
-              />
-              
-              <SettingRow
-                icon={Clock}
-                label="Sleep time"
-                type="value"
-                value={autoSettings.time_down}
-              />
-            </>
-          )}
+    {/* CURTAIN SUB-SETTINGS (Indented) */}
+    <div className={`transition-all duration-500 ease-in-out ${
+      !autoSettings.curtain_routine_active 
+        ? "opacity-30 grayscale pointer-events-none max-h-0 overflow-hidden" 
+        : "opacity-100 max-h-[500px] bg-muted/10"
+    }`}>
+      <div className="pl-10 pr-4 pb-2 divide-y divide-border/40">
+        
+        {/* BIORYTHM */}
+        <SettingRow
+          icon={Activity}
+          label="Biorythm (PIR)"
+          type="toggle"
+          value={autoSettings.use_pir_adjustment}
+          onChange={(val) => updateAutoSetting("use_pir_adjustment", val)}
+        />
 
-          <SettingRow
-            icon={Bell}
-            label="Smart Lighting"
-            description="Enable LED control via light sensor"
-            type="toggle"
-            value={autoSettings.led_routine_active}
-            onChange={(val) => updateAutoSetting("led_routine_active", val)}
-          />
-
-          <SettingRow
-            icon={Thermometer}
-            label="Lux Threshold"
-            description="Sensitivity for light sensor"
-            type="value"
-            value={`${autoSettings.lux_threshold} lx`}
-          />
+        {/* TIME RANGE ROW */}
+        <div className="flex items-center justify-between py-4">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded-xl bg-background flex items-center justify-center border border-border/40">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <span className="text-sm font-medium">Active Window</span>
+          </div>
+          <div className="flex items-center gap-2 bg-background px-3 py-2 rounded-xl border border-border/50 shadow-inner">
+            <input 
+              type="time" 
+              value={autoSettings.time_up}
+              onChange={(e) => updateAutoSetting("time_up", e.target.value)}
+              className="bg-transparent text-sm font-bold w-[70px] outline-none focus:text-primary appearance-none cursor-pointer"
+            />
+            <span className="text-muted-foreground/40 font-light">|</span>
+            <input 
+              type="time" 
+              value={autoSettings.time_down}
+              onChange={(e) => updateAutoSetting("time_down", e.target.value)}
+              className="bg-transparent text-sm font-bold w-[70px] outline-none focus:text-primary appearance-none cursor-pointer"
+            />
+          </div>
         </div>
-      </motion.div>
+      </div>
+    </div>
+
+    {/* LIGHTING SECTION */}
+    <div className="px-4 border-t border-border/50">
+      <SettingRow
+        icon={Sun}
+        label="Smart Lighting"
+        description="LED control via light sensor"
+        type="toggle"
+        value={autoSettings.led_routine_active}
+        onChange={(val) => updateAutoSetting("led_routine_active", val)}
+      />
+    </div>
+
+    {/* LUX SLIDER (Indented) */}
+    <div className={`transition-all duration-500 ease-in-out ${
+      !autoSettings.led_routine_active 
+        ? "opacity-30 grayscale pointer-events-none max-h-0 overflow-hidden" 
+        : "opacity-100 max-h-[500px] bg-muted/10"
+    }`}>
+      <div className="pl-12 pr-6 py-5">
+        <div className="flex justify-between items-end mb-3">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-tight">Sensitivity</span>
+            <span className="text-[10px] text-muted-foreground/60 italic">Lower = triggers in darker conditions</span>
+          </div>
+          <span className="text-sm font-black text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+            {autoSettings.lux_threshold} <span className="text-[10px] font-medium">LX</span>
+          </span>
+        </div>
+        <input 
+          type="range"
+          min="5"
+          max="150"
+          step="5"
+          value={autoSettings.lux_threshold}
+          onChange={(e) => updateAutoSetting("lux_threshold", parseInt(e.target.value))}
+          className="w-full h-1.5 bg-border rounded-full appearance-none cursor-pointer accent-primary hover:accent-primary/80 transition-all"
+        />
+      </div>
+    </div>
+
+  </div>
+</motion.div>
 
       {/* Device Status Card */}
       <motion.div
