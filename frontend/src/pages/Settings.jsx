@@ -119,7 +119,7 @@ return (
             onChange={(val) =>
          updateAutoSetting("use_pir_adjustment", val)}
          />
-{/* TIME RANGE ROW - Simplified Text Input */}
+         {/* TIME RANGE ROW - Simplified Text Input */}
 <div className="flex items-center justify-between py-4">
   <div className="flex items-center gap-3">
     <div className="h-8 w-8 rounded-xl bg-background flex items-center justify-center border border-border/40">
@@ -154,7 +154,6 @@ return (
     </div>
   </div>
 </div>
-         </div>
       </div>
    </div>
    <div className="px-4 border-t border-border/50">
