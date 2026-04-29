@@ -192,7 +192,7 @@ export default function Settings() {
                   onChange={(e) => updateAutoSetting("lux_threshold", parseInt(e.target.value) || 0)}
                   className="bg-transparent text-sm font-bold w-12 text-center outline-none text-black"
                 />
-                <span className="text-[20px] font-bold text-black uppercase">LX</span>
+                <span className="text-[10px] font-bold text-black uppercase">LX</span>
               </div>
             </div>
           </div>
