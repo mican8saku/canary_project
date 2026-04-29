@@ -11,11 +11,12 @@ from datetime import datetime, timezone
 from flask import Flask, jsonify, send_file, request, Response
 from flask_cors import CORS
 from pathlib import Path
+
 BASE_DIR = Path(__file__).parent.absolute()
 STATE_FILE = BASE_DIR / "state.json"
 
 app = Flask(__name__)
-# Krävs för att hans Base44-app ska kunna prata med din Pi
+# Krävs för att Webbapp ska kunna prata med Pien
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # --- KONFIGURATION & FILER ---
@@ -30,11 +31,17 @@ light_state = False
 last_motion_at = datetime.now(timezone.utc).isoformat()
 MOTION_IDLE_THRESHOLD = 30 # Sekunder innan fågeln räknas som inaktiv
 
-# --- AUTOMATIONS-SETTINGS ---
-TID_UPP = "08:00"      # Senaste tid för morgonöppning
-TID_NER = "17:30"      # Senaste tid för kvällsstängning
-STILL_MINUTER = 5      # Inaktivitet innan stängning i kvällsfönstret
-LUX_THRESHOLD = 30.0   # Gräns för när LED-strippen ska tändas
+# --- AUTOMATIONS-INSTÄLLNINGAR (Default-värden) ---
+auto_settings = {
+    "led_routine_active": True,       # Övergripande LED-automation
+    "curtain_routine_active": True,   # Övergripande gardin-automation
+    "use_pir_adjustment": True,       # Specifikt PIR-fönstret (1h innan)
+    "window_hours": 1,                # Hur långt innan PIR ska börja vaktas
+    "lux_threshold": 30.0,            # LUX värde borderline för att sätta igång ljus
+    "still_minutes": 5                # Hur länge PIR 
+    "time_up": "08:00",         
+    "time_down": "21:30"    
+}
 
 # Variabler för att hålla koll på tillstånd
 last_motion_time = time.time()
@@ -42,24 +49,29 @@ auto_light_active = False
 
 def save_state():
     try:
-        with os.fdopen(os.open(STATE_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w') as f:
-            json.dump({
-                "curtainState": curtain_state,
-                "lastMotionAt": last_motion_at
-            }, f, indent=2)
+        data = {
+            "curtainState": curtain_state,
+            "lastMotionAt": last_motion_at,
+            "autoSettings": auto_settings  # Spara även inställningarna
+        }
+        with open(STATE_FILE, 'w') as f:
+            json.dump(data, f, indent=2)
     except Exception as e:
-        print(f"Kunde inte spara state: {e}")
+        print(f"Save error: {e}")
 
 def load_state():
-    global curtain_state, last_motion_at
+    global curtain_state, last_motion_at, auto_settings
     if STATE_FILE.exists():
         try:
             with open(STATE_FILE, "r") as f:
                 data = json.load(f)
                 curtain_state = data.get("curtainState", 0)
                 last_motion_at = data.get("lastMotionAt", last_motion_at)
+                # Läs in sparade inställningar om de finns
+                if "autoSettings" in data:
+                    auto_settings.update(data["autoSettings"])
         except Exception as e:
-            print(f"Error loading state: {e}")
+            print(f"Load error: {e}")
 
 load_state()
 
@@ -99,6 +111,8 @@ except Exception as e:
     IS_PI = False
     print(f"--- Running on PC (Mock Mode) --- Error: {e}")
 
+# --- STYRNING AV RULLGARDIN ---
+
 def move_curtain_gradually(target_percent):
     global curtain_state, is_moving
     is_moving = True
@@ -128,6 +142,8 @@ def move_curtain_gradually(target_percent):
     finally:
         is_moving = False
 
+# --- TRÅDAR ---
+
 def button_control_thread():
     global curtain_state, is_moving, light_state
     print("Knapp-kontroll startad.")
@@ -139,7 +155,7 @@ def button_control_thread():
             time.sleep(0.5)
             continue
 
-        # --- LJUSKONTROLL (Kolla denna först, den ska alltid gå att trycka på) ---
+        # --- LJUSKONTROLL ---
         if GPIO.input(LEDSTRIP_BUTTON) == GPIO.LOW:
             light_state = not light_state
             
@@ -152,8 +168,6 @@ def button_control_thread():
                 time.sleep(0.1)
 
         # --- GARDINKONTROLL ---
-        # Vi låter knapparna fungera även om is_moving är True (så man kan avbryta/justera)
-        # men om du vill ha den helt låst under API-körning, behåll "if is_moving: continue"
         if is_moving:
             time.sleep(0.1)
             continue
@@ -180,76 +194,78 @@ def button_control_thread():
             time.sleep(0.05)
 
 def automation_routine_thread():
-    """Huvudrutin för fågelns biorytm: Gardiner (PIR + Tid) och Ljus (Lux + Tid)"""
     global last_motion_time, auto_light_active, curtain_state, is_moving
     
-    if not IS_PI:
-        print("Automation: Mock mode - thread exiting")
-        return
+    if not IS_PI: return
 
-    print(f"Automation: Biorythm active. Window: {TID_UPP} - {TID_NER}")
+    # Håll koll på vilka tider som är schemalagda just nu
+    current_scheduled_up = auto_settings["time_up"]
+    current_scheduled_down = auto_settings["time_down"]
 
-    # Schemalägg fasta tider som backup (använder dina gradvisa funktioner)
-    schedule.every().day.at(TID_UPP).do(lambda: start_curtain_thread(100, "Fixed morning time"))
-    schedule.every().day.at(TID_NER).do(lambda: start_curtain_thread(0, "Fixed evening time"))
+    # Initial schemaläggning
+    schedule.every().day.at(current_scheduled_up).do(lambda: start_curtain_thread(100, "Fixed morning time"))
+    schedule.every().day.at(current_scheduled_down).do(lambda: start_curtain_thread(0, "Fixed evening time"))
 
     while True:
         try:
             nu = datetime.now()
+            
+            # --- DYNAMISK UPPDATERING AV SCHEMA ---
+            # Om tiderna har ändrats via appen, nollställ och schemalägg på nytt
+            if current_scheduled_up != auto_settings["time_up"] or current_scheduled_down != auto_settings["time_down"]:
+                schedule.clear() # Tömmer gamla tider
+                current_scheduled_up = auto_settings["time_up"]
+                current_scheduled_down = auto_settings["time_down"]
+                schedule.every().day.at(current_scheduled_up).do(lambda: start_curtain_thread(100, "Fixed morning time"))
+                schedule.every().day.at(current_scheduled_down).do(lambda: start_curtain_thread(0, "Fixed evening time"))
+                print(f"Schedule updated: Up at {current_scheduled_up}, Down at {current_scheduled_down}")
+
             schedule.run_pending()
 
-            # --- 1. BERÄKNA TIDSFÖNSTER ---
-            # Skapa datetime-objekt för dagens tider
-            upp_obj = datetime.strptime(TID_UPP, "%H:%M").replace(year=nu.year, month=nu.month, day=nu.day)
-            ner_obj = datetime.strptime(TID_NER, "%H:%M").replace(year=nu.year, month=nu.month, day=nu.day)
+            # --- BERÄKNA TIDSFÖNSTER BASERAT PÅ SETTINGS ---
+            upp_obj = datetime.strptime(auto_settings["time_up"], "%H:%M").replace(year=nu.year, month=nu.month, day=nu.day)
+            ner_obj = datetime.strptime(auto_settings["time_down"], "%H:%M").replace(year=nu.year, month=nu.month, day=nu.day)
             
-            morgon_start = upp_obj - timedelta(hours=1)
-            kvall_start = ner_obj - timedelta(hours=1)
+            # Använd window_hours från settings
+            morgon_start = upp_obj - timedelta(hours=auto_settings["window_hours"])
+            kvall_start = ner_obj - timedelta(hours=auto_settings["window_hours"])
 
-            # Läs sensorer
-            rorelse_detekterad = GPIO.input(PIR_PIN)
-            lux = tsl_sensor.lux
-
-            # --- 2. GARDIN-LOGIK (PIR-BASERAD) ---
-            if not is_moving:
-                # MORGON: Om rörelse detekteras 1h innan TID_UPP
-                if morgon_start <= nu <= upp_obj and curtain_state < 100:
-                    if rorelse_detekterad:
-                        print("Automation: Morning motion! Bird is awake. Opening...")
-                        start_curtain_thread(100, "Morning motion")
-
-                # KVÄLL: Om fågeln är stilla i 5 min 1h innan TID_NER
-                elif kvall_start <= nu <= ner_obj and curtain_state > 0:
-                    if rorelse_detekterad:
-                        last_motion_time = time.time() # Nollställ timer
+            # --- GARDIN AUTOMATION ---
+            if auto_settings["curtain_routine_active"] and not is_moving:
+                motion_detected = GPIO.input(PIR_PIN) == GPIO.HIGH
+                
+                if auto_settings["use_pir_adjustment"]:
+                    # Morgon (PIR)
+                    if morgon_start <= nu <= upp_obj and curtain_state < 100:
+                        if motion_detected:
+                            start_curtain_thread(100, "Morning motion")
                     
-                    sekunder_stilla = time.time() - last_motion_time
-                    if sekunder_stilla >= (STILL_MINUTER * 60):
-                        print(f"Automation: Bird still for {STILL_MINUTER} min. Closing early...")
-                        start_curtain_thread(0, "Evening stillness")
+                    # Kväll (PIR)
+                    elif kvall_start <= nu <= ner_obj and curtain_state > 0:
+                        if motion_detected: last_motion_time = time.time()
+                        idle_seconds = time.time() - last_motion_time
+                        if idle_seconds >= (auto_settings["still_minutes"] * 60):
+                            start_curtain_thread(0, "Evening stillness")
 
-            # --- 3. LJUS-LOGIK (LUX + AKTIVT FÖNSTER) ---
-            # Ljussensorn ska bara vara aktiv när gardinen "bör" vara uppe (fågelns dag)
-            if upp_obj <= nu <= ner_obj:
-                if lux < LUX_THRESHOLD and not auto_light_active:
-                    print(f"Automation: Dark in cage ({lux:.2f} lux). Fading in light.")
-                    light.set_light(True)
-                    auto_light_active = True
-                elif lux >= LUX_THRESHOLD and auto_light_active:
-                    print(f"Automation: Sufficient light ({lux:.2f} lux). Fading out.")
-                    light.set_light(False)
-                    auto_light_active = False
-            else:
-                # Nattetid: Tvinga lampan att vara släckt
-                if auto_light_active:
-                    print("Automation: Night time, forcing light off.")
-                    light.set_light(False)
-                    auto_light_active = False
+            # --- LED AUTOMATION ---
+            if auto_settings["led_routine_active"]:
+                lux = tsl_sensor.lux
+                if upp_obj <= nu <= ner_obj:
+                    if lux < auto_settings["lux_threshold"] and not auto_light_active:
+                        light.set_light(True)
+                        auto_light_active = True
+                    elif lux >= auto_settings["lux_threshold"] and auto_light_active:
+                        light.set_light(False)
+                        auto_light_active = False
+                else:
+                    if auto_light_active:
+                        light.set_light(False)
+                        auto_light_active = False
 
         except Exception as e:
-            print(f"Automation loop error: {e}")
+            print(f"Automation error: {e}")
         
-        time.sleep(0.5) # Snabbare loop för att fånga upp rörelse (PIR)
+        time.sleep(0.5)
 
 def start_curtain_thread(target, reason):
     """Hjälpfunktion för att starta gradvis flytt i en egen tråd"""
@@ -273,7 +289,7 @@ def get_bird_status(motion_now):
     idle_time = (datetime.now(timezone.utc) - last_motion).total_seconds()
     return "active" if idle_time < MOTION_IDLE_THRESHOLD else "inactive"
 
-# --- INTEGRATION ROUTES (För Base44 gränssnitt) ---
+# --- INTEGRATION ROUTES (För Webbapp gränssnitt) ---
 
 @app.route('/status', methods=['GET'])
 def status():
@@ -302,6 +318,19 @@ def status():
         "lightOn": light_state,
         "isMoving": is_moving
     })
+
+@app.route('/settings/automation', methods=['POST', 'GET'])
+def update_automation_settings():
+    global auto_settings
+    if request.method == 'POST':
+        new_data = request.get_json()
+        # Uppdatera bara de fält som skickas in
+        auto_settings.update(new_data)
+        save_state()
+        return jsonify({"ok": True, "settings": auto_settings})
+    
+    # Om GET, returnera nuvarande inställningar
+    return jsonify({"ok": True, "settings": auto_settings})
 
 @app.route('/curtain/open', methods=['POST'])
 def curtain_open():
@@ -412,6 +441,8 @@ def camera_stream():
     """Video stream route"""
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
 
 # --- STARTA SERVER ---
 if __name__ == '__main__':

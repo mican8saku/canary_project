@@ -66,11 +66,100 @@ export default function Settings() {
     return `${Math.floor(secondsAgo / 60)}m ago`;
   })();
 
+  const [autoSettings, setAutoSettings] = useState(null);
+
+  // 1. Hämta inställningar en gång vid mount
+  useEffect(() => {
+    apiPost('/settings/automation', {}, 'GET') // Skapa en GET-hjälpare eller använd fetch
+      .then(data => {
+        if (data.ok) setAutoSettings(data.settings);
+      });
+  }, []);
+
+  // 2. Funktion för att spara en enskild inställning
+  const updateSetting = async (key, value) => {
+    // Uppdatera UI direkt för snabb respons
+    setAutoSettings(prev => ({ ...prev, [key]: value }));
+    
+    try {
+      await apiPost('/settings/automation', { [key]: value });
+    } catch (err) {
+      console.error("Failed to save setting:", err);
+      // Valfritt: rulla tillbaka state vid fel
+    }
+  };
+
   return (
     <div className="px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-8">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">Preferences</p>
         <h1 className="text-2xl font-bold text-foreground tracking-tight">Settings</h1>
+      </motion.div>
+
+      {/* Automation Routine */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+        className="mb-6"
+      >
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Automation Routine</h2>
+        <div className="bg-card rounded-2xl border border-border/60 shadow-sm px-4 divide-y divide-border/50">
+          
+          <SettingRow
+            icon={Bird}
+            label="Curtain Automation"
+            description="Auto open/close based on schedule & bird activity"
+            type="toggle"
+            value={autoSettings.curtain_routine_active}
+            onChange={(val) => updateAutoSetting("curtain_routine_active", val)}
+          />
+
+          {autoSettings.curtain_routine_active && (
+            <>
+              <SettingRow
+                icon={Activity}
+                label="Biorythm (PIR)"
+                description="Adjust timing based on bird's movement"
+                type="toggle"
+                value={autoSettings.use_pir_adjustment}
+                onChange={(val) => updateAutoSetting("use_pir_adjustment", val)}
+              />
+              
+              <SettingRow
+                icon={Clock}
+                label="Wake up time"
+                type="value"
+                value={autoSettings.time_up}
+                // Här kan du senare lägga till en TimePicker, kör text så länge
+              />
+              
+              <SettingRow
+                icon={Clock}
+                label="Sleep time"
+                type="value"
+                value={autoSettings.time_down}
+              />
+            </>
+          )}
+
+          <SettingRow
+            icon={Bell} // Eller en sol-ikon/Lightbulb
+            label="Smart Lighting"
+            description="Enable LED strip control via light sensor"
+            type="toggle"
+            value={autoSettings.led_routine_active}
+            onChange={(val) => updateAutoSetting("led_routine_active", val)}
+          />
+
+          <SettingRow
+            icon={Thermometer} // Eller Lux-ikon
+            label="Lux Threshold"
+            description="Sensitivity for the light sensor"
+            type="value"
+            value={`${autoSettings.lux_threshold} lx`}
+          />
+        </div>
       </motion.div>
 
       {/* Device Status Card */}
