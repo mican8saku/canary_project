@@ -38,7 +38,7 @@ auto_settings = {
     "use_pir_adjustment": True,       # Specifikt PIR-fönstret (1h innan)
     "window_hours": 1,                # Hur långt innan PIR ska börja vaktas
     "lux_threshold": 30.0,            # LUX värde borderline för att sätta igång ljus
-    "still_minutes": 5                # Hur länge PIR 
+    "still_minutes": 5,                # Hur länge PIR 
     "time_up": "08:00",         
     "time_down": "21:30"    
 }

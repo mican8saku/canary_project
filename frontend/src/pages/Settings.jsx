@@ -66,7 +66,16 @@ export default function Settings() {
     return `${Math.floor(secondsAgo / 60)}m ago`;
   })();
 
-  const [autoSettings, setAutoSettings] = useState(null);
+      const [autoSettings, setAutoSettings] = useState({
+      led_routine_active: true,
+      curtain_routine_active: true,
+      use_pir_adjustment: true,
+      window_hours: 1,
+      lux_threshold: 30,
+      still_minutes: 5,
+      time_up: "08:00",
+      time_down: "21:30"
+    });
 
   // 1. Hämta inställningar en gång vid mount
   useEffect(() => {
