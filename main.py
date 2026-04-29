@@ -1,6 +1,8 @@
 import os
 import io
 import time
+import schedule
+from datetime import datetime, timedelta
 import json
 import subprocess
 import threading
@@ -27,6 +29,17 @@ is_moving = False
 light_state = False
 last_motion_at = datetime.now(timezone.utc).isoformat()
 MOTION_IDLE_THRESHOLD = 30 # Sekunder innan fågeln räknas som inaktiv
+
+# --- AUTOMATIONS-SETTINGS ---
+LUX_THRESHOLD = 30.0
+auto_light_active = False
+
+# --- TIDSKONFIGURATION ---
+TID_GARDIN_UPP  = "08:00"
+TID_GARDIN_NER  = "20:00"
+
+TID_LUX_START   = "07:30"  # När ljussensorn får börja styra
+TID_LUX_END     = "19:00"  # När ljussensorn slutar styra för dagen
 
 def save_state():
     try:
@@ -166,6 +179,38 @@ def button_control_thread():
                 needs_saving = False
             
             time.sleep(0.05)
+
+def automation_routine_thread():
+    """Tråd som sköter automatiska rutiner (ljussensorn)"""
+    global auto_light_active
+    
+    # Om vi inte ar pa en Pi, avsluta traden direkt
+    if not IS_PI:
+        print("Automation: Mock mode - traden avslutas")
+        return
+
+    print("Automation: Routine thread started")
+
+    while True:
+        try:
+            # Vi använder tsl_sensor som skapades i din setup
+            lux = tsl_sensor.lux
+            
+            if lux < LUX_THRESHOLD and not auto_light_active:
+                print(f"Automation: Dark detected ({lux:.2f} lux). Fading in...")
+                light.set_light(True)
+                auto_light_active = True
+                
+            elif lux >= LUX_THRESHOLD and auto_light_active:
+                print(f"Automation: Light detected ({lux:.2f} lux). Fading out...")
+                light.set_light(False)
+                auto_light_active = False
+
+        except Exception as e:
+            print(f"Automation error: {e}")
+        
+        # 5 sekunders paus for att undvika flimmer vid snabba ljusforandringar
+        time.sleep(5)
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
@@ -327,8 +372,11 @@ if __name__ == '__main__':
     try:
 
         # Starta tråden som "daemon" så den dör när huvudprogrammet dör
-        t = threading.Thread(target=button_control_thread, daemon=True)
-        t.start()
+        t1 = threading.Thread(target=button_control_thread, daemon=True)
+        t1.start()
+
+        t2 = threading.Thread(target=automation_routine_thread, daemon=True)
+        t2.start()
 
         # Körs på port 5000 för att matcha hans frontend-anrop
         app.run(host='0.0.0.0', port=5000, debug=False)
