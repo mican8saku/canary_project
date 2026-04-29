@@ -35,6 +35,7 @@ export default function Settings() {
 const [diag, setDiag] = useState(null);
 const [diagLoading, setDiagLoading] = useState(true);
 const [diagError, setDiagError] = useState(null);
+const [isSaving, setIsSaving] = useState(false);
 const [autoSettings, setAutoSettings] = useState({
 led_routine_active: true,
 curtain_routine_active: true,
@@ -56,20 +57,46 @@ setDiagError(null);
 .finally(() => setDiagLoading(false));
 }, []);
 useEffect(() => {
-apiPost('/settings/automation', {}, 'GET')
-.then(data => {
-if (data && data.ok && data.settings) setAutoSettings(data.settings);
-})
-.catch(err => console.error("Could not fetch automation settings", err));
-}, []);
+  if (isSaving) return; // Hämta INTE data om vi precis har sparat
+  
+  apiPost('/settings/automation', {}, 'GET')
+    .then(data => {
+      if (data?.ok && data.settings) setAutoSettings(data.settings);
+    });
+}, [isSaving]); // Körs när isSaving ändras
+// Lägg till en state för att veta om vi sparar just nu
+const [isSaving, setIsSaving] = useState(false);
+
 const updateAutoSetting = async (key, value) => {
-setAutoSettings(prev => ({ ...prev, [key]: value }));
-try {
-await apiPost('/settings/automation', { [key]: value });
-} catch (err) {
-console.error("Failed to save setting:", err);
-}
+  // 1. Uppdatera UI direkt (Optimistiskt)
+  setAutoSettings(prev => ({ ...prev, [key]: value }));
+  setIsSaving(true); 
+
+  try {
+    const response = await apiPost('/settings/automation', { [key]: value });
+    
+    if (!response.ok) {
+      // Om servern nekar, rulla tillbaka (valfritt men bra)
+      console.error("Server rejected update");
+    }
+  } catch (err) {
+    console.error("Failed to save setting:", err);
+  } finally {
+    // Vänta 2 sekunder innan vi tillåter bakgrundsuppdateringar igen
+    setTimeout(() => setIsSaving(false), 2000);
+  }
 };
+
+// I din useEffect som hämtar inställningar:
+useEffect(() => {
+  if (isSaving) return; // Hämta INTE data om vi precis har sparat
+  
+  apiPost('/settings/automation', {}, 'GET')
+    .then(data => {
+      if (data?.ok && data.settings) setAutoSettings(data.settings);
+    });
+}, [isSaving]); // Körs när isSaving ändras
+
 const isPi = diag?.isPi ?? false;
 const lastMotionLabel = (() => {
 if (!diag?.lastMotionAt) return "Unknown";

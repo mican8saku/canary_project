@@ -233,16 +233,28 @@ def automation_routine_thread():
             # --- GARDIN AUTOMATION ---
             if auto_settings["curtain_routine_active"] and not is_moving:
                 motion_detected = GPIO.input(PIR_PIN) == GPIO.HIGH
-                
-                if auto_settings["use_pir_adjustment"]:
-                    # Morgon (PIR)
+                if motion_detected:
+                    last_motion_time = time.time() # Uppdatera alltid vid rörelse
+
+                # 1. ABSOLUT STÄNGNING (Om klockan är efter time_down)
+                # Denna ser till att gardinen går ner direkt om tiden passerat
+                if nu >= ner_obj and curtain_state > 0:
+                    start_curtain_thread(0, "Scheduled closing (Time window passed)")
+
+                # 2. ABSOLUT ÖPPNING (Valfritt: Om klockan är efter time_up och PIR inte används)
+                elif nu >= upp_obj and not auto_settings["use_pir_adjustment"] and curtain_state < 100:
+                    start_curtain_thread(100, "Scheduled opening")
+
+                # 3. BIORYTHM LOGIK (Endast om vi är inom fönstret)
+                elif auto_settings["use_pir_adjustment"]:
+                    
+                    # Morgon-fönster: Öppna vid första rörelse
                     if morgon_start <= nu <= upp_obj and curtain_state < 100:
                         if motion_detected:
                             start_curtain_thread(100, "Morning motion")
                     
-                    # Kväll (PIR)
+                    # Kvälls-fönster: Stäng om det varit stilla
                     elif kvall_start <= nu <= ner_obj and curtain_state > 0:
-                        if motion_detected: last_motion_time = time.time()
                         idle_seconds = time.time() - last_motion_time
                         if idle_seconds >= (auto_settings["still_minutes"] * 60):
                             start_curtain_thread(0, "Evening stillness")
