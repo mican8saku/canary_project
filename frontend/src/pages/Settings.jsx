@@ -139,28 +139,31 @@ export default function Settings() {
                   <span className="text-sm font-medium text-foreground">Active Window</span>
                 </div>
                 
-                {/* Bredare input-ruta med Sunrise/Sunset ikoner */}
-                <div className="flex items-center gap-3 bg-background px-4 py-2.5 rounded-xl border border-border/50 shadow-inner min-w-[200px] justify-between">
-                  <div className="flex items-center gap-2">
-                    <Sunrise className="h-3.5 w-3.5 text-orange-400" />
-                    <input 
-                      type="time" 
-                      value={autoSettings.time_up}
-                      onChange={(e) => updateAutoSetting("time_up", e.target.value)}
-                      className="bg-transparent text-sm font-bold w-[80px] outline-none text-foreground cursor-pointer"
-                    />
-                  </div>
-                  <span className="text-muted-foreground/30 font-light">|</span>
-                  <div className="flex items-center gap-2">
-                    <Sunset className="h-3.5 w-3.5 text-blue-400" />
-                    <input 
-                      type="time" 
-                      value={autoSettings.time_down}
-                      onChange={(e) => updateAutoSetting("time_down", e.target.value)}
-                      className="bg-transparent text-sm font-bold w-[80px] outline-none text-foreground cursor-pointer"
-                    />
-                  </div>
+                <div className="flex items-center gap-3 bg-background px-4 py-2.5 rounded-xl border border-border/50 shadow-inner min-w-[210px] justify-between">
+                <div className="flex items-center gap-2">
+                  <Sunrise className="h-3.5 w-3.5 text-orange-400" />
+                  <input 
+                    type="time" 
+                    step="60" // Tvingar ofta webbläsaren att hålla sig till renare format
+                    value={autoSettings.time_up}
+                    onChange={(e) => updateAutoSetting("time_up", e.target.value)}
+                    className="bg-transparent text-sm font-bold w-[60px] outline-none text-foreground cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
+                    style={{ border: 'none', padding: 0 }}
+                  />
                 </div>
+                <span className="text-muted-foreground/30 font-light">|</span>
+                <div className="flex items-center gap-2">
+                  <Sunset className="h-3.5 w-3.5 text-blue-400" />
+                  <input 
+                    type="time" 
+                    step="60"
+                    value={autoSettings.time_down}
+                    onChange={(e) => updateAutoSetting("time_down", e.target.value)}
+                    className="bg-transparent text-sm font-bold w-[60px] outline-none text-foreground cursor-pointer [color-scheme:light] dark:[color-scheme:dark]"
+                    style={{ border: 'none', padding: 0 }}
+                  />
+                </div>
+              </div>
               </div>
             </div>
           </div>
