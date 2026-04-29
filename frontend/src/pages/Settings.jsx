@@ -117,94 +117,62 @@ export default function Settings() {
         transition={{ delay: 0.12 }}
         className="mb-6"
       >
-        {/* --- AUTOMATION SECTION --- */}
-      <section>
-        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 ml-1">Automation</h2>
-        <div className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+        <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">Automation Routine</h2>
+        <div className="bg-card rounded-2xl border border-border/60 shadow-sm px-4 divide-y divide-border/50">
           
-          {/* CURTAIN MAIN TOGGLE */}
-          <div className="px-4 border-b border-border/50">
-            <SettingRow
-              icon={Blinds}
-              label="Curtain Automation"
-              description="Manage blinds based on bird activity"
-              type="toggle"
-              value={autoSettings.curtain_routine_active}
-              onChange={(val) => updateAutoSetting("curtain_routine_active", val)}
-            />
-          </div>
+          <SettingRow
+            icon={Bird}
+            label="Curtain Automation"
+            description="Auto open/close based on schedule"
+            type="toggle"
+            value={autoSettings.curtain_routine_active}
+            onChange={(val) => updateAutoSetting("curtain_routine_active", val)}
+          />
 
-          {/* SUB-SETTINGS (Indented & Grayed out if inactive) */}
-          <div className={`transition-all duration-300 ${!autoSettings.curtain_routine_active ? "opacity-40 grayscale-[0.5] pointer-events-none" : "opacity-100"}`}>
-            <div className="pl-8 pr-4 divide-y divide-border/40 bg-muted/20">
-              
-              {/* BIORYTHM */}
+          {autoSettings.curtain_routine_active && (
+            <>
               <SettingRow
                 icon={Activity}
                 label="Biorythm (PIR)"
+                description="Adjust timing based on movement (1h window before set scheduele) "
                 type="toggle"
                 value={autoSettings.use_pir_adjustment}
                 onChange={(val) => updateAutoSetting("use_pir_adjustment", val)}
               />
-
-              {/* TIME RANGE ROW */}
-              <div className="flex items-center justify-between py-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-xl bg-background flex items-center justify-center">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <span className="text-sm font-medium">Active Window</span>
-                </div>
-                <div className="flex items-center gap-2 bg-background p-1.5 rounded-lg border border-border/50 shadow-sm">
-                  <input 
-                    type="time" 
-                    value={autoSettings.time_up}
-                    onChange={(e) => updateAutoSetting("time_up", e.target.value)}
-                    className="bg-transparent text-sm font-bold w-16 text-center outline-none focus:text-primary"
-                  />
-                  <span className="text-muted-foreground text-xs">—</span>
-                  <input 
-                    type="time" 
-                    value={autoSettings.time_down}
-                    onChange={(e) => updateAutoSetting("time_down", e.target.value)}
-                    className="bg-transparent text-sm font-bold w-16 text-center outline-none focus:text-primary"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* LIGHTING SECTION */}
-          <div className="px-4 border-t border-border/50">
-            <SettingRow
-              icon={Sun}
-              label="Smart Lighting"
-              type="toggle"
-              value={autoSettings.led_routine_active}
-              onChange={(val) => updateAutoSetting("led_routine_active", val)}
-            />
-          </div>
-
-          {/* LUX SLIDER (Indented & Grayed out if inactive) */}
-          <div className={`transition-all duration-300 ${!autoSettings.led_routine_active ? "opacity-40 grayscale-[0.5] pointer-events-none" : "opacity-100"}`}>
-            <div className="pl-8 pr-4 py-4 bg-muted/20">
-              <div className="flex justify-between mb-2">
-                <span className="text-xs text-muted-foreground">Lux Threshold</span>
-                <span className="text-xs font-bold text-primary">{autoSettings.lux_threshold} lx</span>
-              </div>
-              <input 
-                type="range"
-                min="0"
-                max="200"
-                value={autoSettings.lux_threshold}
-                onChange={(e) => updateAutoSetting("lux_threshold", parseInt(e.target.value))}
-                className="w-full h-1.5 bg-border rounded-lg appearance-none cursor-pointer accent-primary"
+              
+              <SettingRow
+                icon={Clock}
+                label="Wake up time"
+                type="value"
+                value={autoSettings.time_up}
               />
-            </div>
-          </div>
+              
+              <SettingRow
+                icon={Clock}
+                label="Sleep time"
+                type="value"
+                value={autoSettings.time_down}
+              />
+            </>
+          )}
 
+          <SettingRow
+            icon={Bell}
+            label="Smart Lighting"
+            description="Enable LED control via light sensor"
+            type="toggle"
+            value={autoSettings.led_routine_active}
+            onChange={(val) => updateAutoSetting("led_routine_active", val)}
+          />
+
+          <SettingRow
+            icon={Thermometer}
+            label="Lux Threshold"
+            description="Sensitivity for light sensor"
+            type="value"
+            value={`${autoSettings.lux_threshold} lx`}
+          />
         </div>
-      </section>
       </motion.div>
 
       {/* Device Status Card */}
