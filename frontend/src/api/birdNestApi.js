@@ -29,14 +29,15 @@ async function apiGet(path) {
   return result.data !== undefined ? result.data : result;
 }
 
-export async function apiPost(path, body = {}) {
+export async function apiPost(path, body = {}, method = "POST") {
   const res = await fetch(`${BASE_URL}${path}`, {
-    method: "POST",
+    method: method, // Nu kan vi även använda 'GET' om vi vill via apiPost
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(body),
+    // Skicka bara body om det inte är en GET-request
+    body: method !== 'GET' ? JSON.stringify(body) : undefined,
   });
 
   const result = await parseJsonSafely(res);
@@ -49,7 +50,8 @@ export async function apiPost(path, body = {}) {
     throw new Error(result?.error || `POST ${path} failed`);
   }
 
-  return result.data;
+  // FIX HÄR: Returnera result.data om det finns, annars hela objektet
+  return result.data !== undefined ? result.data : result;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
