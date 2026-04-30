@@ -1,4 +1,4 @@
-<65;53;14M<65;53;14M<65;53;14M<65;53;14Mimport React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LineChart, Line, AreaChart, Area, XAxis, YAxis, 
   CartesianGrid, Tooltip, ResponsiveContainer 
