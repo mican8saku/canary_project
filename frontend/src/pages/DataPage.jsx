@@ -4,10 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, 
   CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
-import { 
-  Activity, Thermometer, Sun, Loader2, 
-  AlertCircle 
-} from "lucide-react";
+import { Activity, Thermometer, Sun, Loader2, AlertCircle, RefreshCcw } from "lucide-react";
 import { BASE_URL } from "../api/birdNestApi";
 
 function ChartContainer({ icon: Icon, title, colorClass, children }) {
@@ -40,28 +37,12 @@ export default function DataPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('24h');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const getFilteredData = (rawData) => {
-    if (!rawData) return [];
+  const fetchData = (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    setIsRefreshing(true);
     
-    switch (viewMode) {
-      case '1h':
-        return rawData.slice(-60);    // 60 minuter
-      case '3h':
-        return rawData.slice(-180);   // 3 * 60 minuter
-      case '6h':
-        return rawData.slice(-360);   // 6 * 60 minuter
-      case '12h':
-        return rawData.slice(-720);   // 12 * 60 minuter
-      case '24h':
-        return rawData.slice(-1440);  // 24 * 60 minuter
-      default:
-        return rawData;
-    }
-  };
-
-  const fetchData = () => {
-    setLoading(true);
     fetch(`${BASE_URL}/api/sensors`)
       .then(res => res.json())
       .then(json => {
@@ -72,35 +53,56 @@ export default function DataPage() {
         console.error(err);
         setError("Failed to reach BirdNest Pi");
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setIsRefreshing(false);
+      });
   };
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(() => fetchData(false), 30000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Genererar jämna klockslag för X-axeln om man kör 24h mode
+  const getFilteredData = (rawData) => {
+    if (!rawData) return [];
+    const modes = {
+      '1h': 60,
+      '3h': 180,
+      '6h': 360,
+      '12h': 720,
+      '24h': 1440
+    };
+    return rawData.slice(-(modes[viewMode] || 1440));
+  };
+
   const timeTicks = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:59"];
 
   return (
     <div className="px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-8 space-y-6">
       
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
+      <motion.div className="flex justify-between items-end">
         <div>
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">Environmental</p>
+          <div className="flex items-center gap-2">
+             <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest">Environmental</p>
+             <button 
+               onClick={() => fetchData(false)} 
+               className={`p-1 hover:bg-muted rounded-full transition-all ${isRefreshing ? 'animate-spin' : ''}`}
+             >
+               <RefreshCcw className="h-3 w-3 text-muted-foreground" />
+             </button>
+          </div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Sensor Data</h1>
         </div>
         
-        {/* TIDSKONTROLL */}
         <div className="flex bg-muted p-1 rounded-xl border border-border/50">
           {['1h', '3h', '6h', '12h', '24h'].map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
               className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
-                viewMode === mode 
-                  ? "bg-background text-foreground shadow-sm" 
-                  : "text-muted-foreground hover:text-foreground"
+                viewMode === mode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
               }`}
             >
               {mode}
@@ -122,10 +124,9 @@ export default function DataPage() {
       ) : (
         <div className="space-y-8">
           
-          {/* 1. AKTIVITET (PIR) - NU HÖGST UPP */}
           <ChartContainer title="Bird Activity" icon={Activity} colorClass="text-green-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={getFilteredData(data.pir)}>
+              <AreaChart key={viewMode} data={getFilteredData(data.pir)}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
@@ -151,10 +152,9 @@ export default function DataPage() {
             </ResponsiveContainer>
           </ChartContainer>
 
-          {/* 2. TEMPERATUR - FIXED RANGE [15-35] */}
           <ChartContainer title="Air Temperature" icon={Thermometer} colorClass="text-orange-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={getFilteredData(data.temperature)}>
+              <AreaChart key={viewMode} data={getFilteredData(data.temperature)}>
                 <defs>
                   <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#f97316" stopOpacity={0.4}/>
@@ -194,10 +194,9 @@ export default function DataPage() {
             </ResponsiveContainer>
           </ChartContainer>
 
-          {/* 3. LJUSNIVÅ - FIXED RANGE [0-1000] */}
           <ChartContainer title="Light Intensity" icon={Sun} colorClass="text-yellow-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={getFilteredData(data.light)}>
+              <AreaChart key={viewMode} data={getFilteredData(data.light)}>
                 <defs>
                   <linearGradient id="colorLight" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#eab308" stopOpacity={0.2}/>
