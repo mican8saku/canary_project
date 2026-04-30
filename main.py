@@ -420,13 +420,24 @@ def get_curtain_str():
 
 def get_bird_status(motion_now):
     global last_motion_at
+    # Skapa nuvarande tid med UTC-aware objekt
+    now = datetime.now(timezone.utc)
+    
     if motion_now:
-        last_motion_at = datetime.now(timezone.utc).isoformat()
+        last_motion_at = now.isoformat()
         save_state()
         return "active"
     
+    # Gör om den sparade strängen till ett objekt
     last_motion = datetime.fromisoformat(last_motion_at)
-    idle_time = (datetime.now(timezone.utc) - last_motion).total_seconds()
+    
+    # VIKTIGT: Om det sparade objektet saknar tidszon, lägg till UTC
+    if last_motion.tzinfo is None:
+        last_motion = last_motion.replace(tzinfo=timezone.utc)
+    
+    # Nu kan vi subtrahera dem utan krasch
+    idle_time = (now - last_motion).total_seconds()
+    
     return "active" if idle_time < MOTION_IDLE_THRESHOLD else "inactive"
 
 # --- INTEGRATION ROUTES (För Webbapp gränssnitt) ---
