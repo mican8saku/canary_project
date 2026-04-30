@@ -8,6 +8,7 @@ export default function CameraPage() {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isCapturing, setIsCapturing] = useState(false);
+  const { isCapturing } = useBirdNest();
 
   const fetchGallery = async () => {
     try {
@@ -48,14 +49,14 @@ export default function CameraPage() {
           <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em] mb-1">Surveillance</p>
           <h1 className="text-3xl font-bold text-foreground tracking-tight">BirdNest <span className="text-primary">Cam</span></h1>
         </div>
-        {/* <button 
+        <button 
           onClick={takeSnapshot}
           disabled={isCapturing}
           className="h-12 px-6 bg-primary text-primary-foreground rounded-2xl font-bold shadow-lg shadow-primary/20 flex items-center gap-2 active:scale-95 disabled:opacity-50 transition-all"
         >
           {isCapturing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
           Capture
-        </button> */}
+        </button>
       </div>
 
       {/* Video Stream Section */}
@@ -64,7 +65,7 @@ export default function CameraPage() {
           <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Live Feed</h2>
           <span className="text-[10px] text-green-500 font-bold bg-green-500/10 px-2 py-0.5 rounded-full">Encrypted Connection</span>
         </div>
-        <LiveCameraView />
+        <LiveCameraView isCapturing={isCapturing} />
       </section>
 
       {/* Gallery Section */}

@@ -1,15 +1,25 @@
-import { useState, useCallback } from "react";
-import { CameraOff, RefreshCw, Maximize2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react"; // Lagt till useEffect
+import { CameraOff, RefreshCw } from "lucide-react";
 import { BASE_URL } from "../api/birdNestApi"; 
 
-export default function LiveCameraView() {
+export default function LiveCameraView({ isCapturing }) { // Ta emot isCapturing som prop
   const [error, setError] = useState(false);
   const [key, setKey] = useState(0);
 
-  const reloadStream = () => {
+  const reloadStream = useCallback(() => {
     setError(false);
     setKey(prev => prev + 1);
-  };
+  }, []);
+
+  // Automatisk återanslutning efter att snapshot är klart
+  useEffect(() => {
+    if (!isCapturing && error) {
+      const timer = setTimeout(() => {
+        reloadStream();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [isCapturing, error, reloadStream]);
 
   return (
     <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 border border-white/5 shadow-xl">
@@ -26,7 +36,6 @@ export default function LiveCameraView() {
         </div>
       ) : (
         <>
-          {/* HÄR ÄR TRICKET: Vi använder /camera/stream direkt */}
           <img 
             key={key}
             src={`${BASE_URL}/camera/stream?t=${key}`} 
@@ -35,10 +44,19 @@ export default function LiveCameraView() {
             onError={() => setError(true)}
           />
           
-          {/* Overlay info */}
+          {/* Status Overlay */}
           <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-            <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            <span className="text-[10px] text-white font-black uppercase tracking-widest">Live 480p</span>
+            {isCapturing ? (
+              <>
+                <span className="w-2 h-2 bg-amber-500 rounded-full animate-ping" />
+                <span className="text-[10px] text-amber-500 font-black uppercase tracking-widest">Saving...</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <span className="text-[10px] text-white font-black uppercase tracking-widest">Live</span>
+              </>
+            )}
           </div>
 
           <div className="absolute bottom-4 right-4 flex gap-2">
