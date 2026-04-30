@@ -13,6 +13,7 @@ from flask_cors import CORS
 
 BASE_DIR = Path(__file__).parent.absolute()
 STATE_FILE = BASE_DIR / "state.json"
+HISTORY_FILE = BASE_DIR / "sensor_history.json"
 
 app = Flask(__name__)
 # Krävs för att Webbapp ska kunna prata med Pien
@@ -52,7 +53,7 @@ sensor_history = {
     "light": [],
     "pir": []
 }
-MAX_POINTS = 144  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
+MAX_POINTS = 1440  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
 
 def save_state():
     try:
@@ -81,6 +82,30 @@ def load_state():
             print(f"Load error: {e}")
 
 load_state()
+
+def save_history():
+    try:
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(sensor_history, f)
+    except Exception as e:
+        print(f"Error saving history: {e}")
+
+def load_history():
+    global sensor_history
+    if HISTORY_FILE.exists():
+        try:
+            with open(HISTORY_FILE, 'r') as f:
+                data = json.load(f)
+                # Säkerställ att alla nycklar finns
+                for key in ["temperature", "light", "pir"]:
+                    if key in data:
+                        sensor_history[key] = data[key]
+            print("History loaded from disk.")
+        except Exception as e:
+            print(f"Error loading history: {e}")
+
+# Kalla på denna i början av programmet (t.ex. efter load_state())
+load_history()
 
 # --- HÅRDVARA SETUP ---
 try:
@@ -308,58 +333,64 @@ def start_curtain_thread(target, reason):
         threading.Thread(target=move_curtain_gradually, args=(target,), daemon=True).start()
 
 def history_collector_thread():
-    """
-    Bakgrundstråd som samlar in sensordata med jämna mellanrum 
-    för att populera graferna i frontend.
-    """
     global sensor_history
-    print("Staring History Collector Thread...")
+    print("Starting Optimized History Collector...")
+    
+    motion_accumulator = 0
+    loop_count = 0
 
     while True:
         try:
-            # 1. Hämta aktuell tid för X-axeln
-            now = datetime.now()
-            timestamp = now.strftime("%H:%M")
-
-            # 2. Samla in data (återanvänder din befintliga logik)
-            # Temperatur (Ersätt 22.0 med din faktiska sensor-läsning när den är klar)
+            # --- SNABB LOOP (Var 10:e sekund) ---
+            # Kolla rörelse ofta för att inte missa fågelns aktivitet
             if IS_PI:
-                try:
-                    current_temp = dht_device.temperature
-                    if current_temp is None:
-                        current_temp = 22.0
-                except:
-                    current_temp = 22.0
-            else:
-                current_temp = 22.0
+                if GPIO.input(PIR_PIN) == 1:
+                    motion_accumulator += 1
             
-            # Ljusnivå
-            lux = tsl_sensor.lux if IS_PI else 350.0
-            current_lux = round(lux, 1)
+            loop_count += 1
 
-            # Rörelse (PIR)
-            motion_now = (GPIO.input(PIR_PIN) == 1) if IS_PI else False
-            current_pir = 1 if motion_now else 0
+            # --- LOGGNINGS-INTERVALL (Varje minut: 6 * 10s) ---
+            if loop_count >= 6:
+                now = datetime.now()
+                timestamp = now.strftime("%H:%M")
 
-            # 3. Uppdatera historiken
-            sensor_history["temperature"].append({"time": timestamp, "value": current_temp})
-            sensor_history["light"].append({"time": timestamp, "value": current_lux})
-            sensor_history["pir"].append({"time": timestamp, "value": current_pir})
+                # Hämta temperatur
+                if IS_PI:
+                    try:
+                        temp = dht_device.temperature
+                        current_temp = temp if temp is not None else 22.0
+                    except:
+                        current_temp = 22.0
+                else:
+                    current_temp = 22.0
 
-            # 4. Håll listan inom MAX_POINTS för att inte äta upp RAM
-            for key in sensor_history:
-                if len(sensor_history[key]) > MAX_POINTS:
-                    sensor_history[key].pop(0)
+                # Hämta ljus
+                lux = tsl_sensor.lux if IS_PI else 350.0
+                current_lux = round(lux, 1)
 
-            # print(f"History Logged: {timestamp} - T:{current_temp} L:{current_lux} P:{current_pir}")
+                # Spara data
+                sensor_history["temperature"].append({"time": timestamp, "value": current_temp})
+                sensor_history["light"].append({"time": timestamp, "value": current_lux})
+                # PIR-värdet blir nu ett tal mellan 0 och 6 (hur aktiv fågeln var denna minut)
+                sensor_history["pir"].append({"time": timestamp, "value": motion_accumulator})
+
+                # Håll listan inom MAX_POINTS (1440 punkter = 24 timmar om vi loggar varje minut)
+                MAX_24H_POINTS = 1440
+                for key in sensor_history:
+                    if len(sensor_history[key]) > MAX_24H_POINTS:
+                        sensor_history[key].pop(0)
+
+                # Spara till fil så vi inte tappar data vid omstart
+                save_history()
+
+                # Nollställ mätare för nästa minut
+                motion_accumulator = 0
+                loop_count = 0
 
         except Exception as e:
-            # Logga fel men låt tråden fortsätta köra
-            print(f"Critical Error in History Collector: {e}")
+            print(f"Error in history thread: {e}")
 
-        # 5. Vänta i 10 minuter (600 sekunder) till nästa mätning
-        # Tips: Under testning kan du ändra detta till 10 för att se graferna fyllas snabbt
-        time.sleep(30)
+        time.sleep(10) # Vänta 10 sekunder mellan varje PIR-koll
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
