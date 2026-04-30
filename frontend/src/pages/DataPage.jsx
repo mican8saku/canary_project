@@ -1,97 +1,146 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from "framer-motion";
 import { 
   LineChart, Line, AreaChart, Area, XAxis, YAxis, 
   CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
-import { BASE_URL } from "../api/birdNestApi"; // Din miljövariabel
+import { 
+  Activity, Thermometer, Sun, Loader2, 
+  AlertCircle, LayoutDashboard, RefreshCcw 
+} from "lucide-react";
+import { BASE_URL } from "../api/birdNestApi";
+
+// Komponent för att matcha dina "Diagnostics"-rader fast för grafer
+function ChartContainer({ icon: Icon, title, colorClass, children }) {
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-2"
+    >
+      <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-widest ml-1">
+        {title}
+      </h2>
+      <div className="bg-card rounded-3xl border border-border/60 shadow-sm overflow-hidden p-5">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-8 w-8 rounded-xl bg-muted flex items-center justify-center">
+            <Icon className={`h-4 w-4 ${colorClass}`} />
+          </div>
+          <span className="text-sm font-medium text-foreground italic opacity-70">Live Analytics</span>
+        </div>
+        <div className="h-64 w-full">
+          {children}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 export default function DataPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    // Använder miljövariabeln för att nå din Flask-server
+  const fetchData = () => {
+    setLoading(true);
     fetch(`${BASE_URL}/api/sensors`)
       .then(res => res.json())
       .then(json => {
         setData(json);
-        setLoading(false);
+        setError(null);
       })
-      .catch(err => {
-        console.error("Error fetching sensor data:", err);
-        setLoading(false);
-      });
+      .catch(err => setError("Failed to reach BirdNest Pi"))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchData();
   }, []);
 
-  if (loading) {
-    return <div className="p-10 text-center text-slate-400">Laddar sensordata...</div>;
-  }
-
   return (
-    <div className="p-4 sm:p-10 bg-slate-900 min-h-screen text-white">
-      <div className="max-w-7xl mx-auto space-y-8">
-        
-        <header>
-          <h1 className="text-3xl font-bold text-emerald-400">Sensorstatistik</h1>
-          <p className="text-slate-400 mt-2">Historik och realtidsvärden från fågelholken</p>
-        </header>
+    <div className="px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-8 space-y-6">
+      
+      {/* HEADER - Samma som Settings */}
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
+        <div>
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">Environmental</p>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Sensor Data</h1>
+        </div>
+        <button 
+          onClick={fetchData}
+          className="h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
+        >
+          <RefreshCcw className={`h-4 w-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
+        </button>
+      </motion.div>
 
-        {data ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            
-            {/* TEMPERATURGRAF */}
-            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
-              <h2 className="text-lg font-medium mb-4 text-rose-400">Temperatur (°C)</h2>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.temperature}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                    <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} />
-                    <YAxis stroke="#94a3b8" fontSize={12} />
-                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }} />
-                    <Line type="monotone" dataKey="value" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4 }} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+      {loading && !data ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground font-medium">Gathering intel...</p>
+        </div>
+      ) : error ? (
+        <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-6 flex flex-col items-center gap-2 text-destructive">
+          <AlertCircle className="h-8 w-8" />
+          <p className="font-semibold text-sm">Pi is Offline</p>
+          <p className="text-xs opacity-80 italic">Could not fetch telemetry</p>
+        </div>
+      ) : (
+        <div className="space-y-8">
+          
+          {/* TEMPERATUR - Linjediagram */}
+          <ChartContainer title="Air Temperature" icon={Thermometer} colorClass="text-orange-500">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.temperature}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                <XAxis dataKey="time" hide />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} domain={['dataMin - 1', 'dataMax + 1']} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
+                  itemStyle={{ color: 'hsl(var(--foreground))' }}
+                />
+                <Line type="monotone" dataKey="value" stroke="hsl(var(--foreground))" strokeWidth={3} dot={{ r: 4, fill: '#f97316' }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </ChartContainer>
 
-            {/* LJUSGRAF */}
-            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
-              <h2 className="text-lg font-medium mb-4 text-amber-400">Ljusnivå (Lux)</h2>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data.light}>
-                    <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} />
-                    <YAxis stroke="#94a3b8" fontSize={12} />
-                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }} />
-                    <Area type="monotone" dataKey="value" stroke="#fbbf24" fill="#fbbf2420" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+          {/* LJUSNIVÅ - Ytdiagram */}
+          <ChartContainer title="Light Intensity" icon={Sun} colorClass="text-yellow-500">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.light}>
+                <defs>
+                  <linearGradient id="colorLight" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#eab308" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                <XAxis dataKey="time" hide />
+                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                <Tooltip 
+                   contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
+                />
+                <Area type="monotone" dataKey="value" stroke="#eab308" fillOpacity={1} fill="url(#colorLight)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartContainer>
 
-            {/* PIR (RÖRELSE) - Full bredd i botten */}
-            <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl lg:col-span-2">
-              <h2 className="text-lg font-medium mb-4 text-emerald-400">Rörelseaktivitet (PIR)</h2>
-              <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data.pir}>
-                    <XAxis dataKey="time" stroke="#94a3b8" fontSize={12} />
-                    <YAxis hide />
-                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }} />
-                    <Area type="step" dataKey="value" stroke="#10b981" fill="#10b98120" strokeWidth={2} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+          {/* AKTIVITET - Stegdiagram */}
+          <ChartContainer title="Activity Log (PIR)" icon={Activity} colorClass="text-green-500">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.pir}>
+                <XAxis dataKey="time" hide />
+                <YAxis hide />
+                <Tooltip 
+                   contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
+                />
+                <Area type="stepAfter" dataKey="value" stroke="#22c55e" fill="#22c55e" fillOpacity={0.1} strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartContainer>
 
-          </div>
-        ) : (
-          <div className="text-center py-20 text-rose-400 bg-slate-800 rounded-2xl border border-slate-700">
-            Kunde inte hämta data. Kontrollera anslutningen till din Raspberry Pi.
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

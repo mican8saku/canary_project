@@ -48,6 +48,14 @@ last_motion_time = time.time()
 auto_light_active = False
 manual_override_until = 0  # Timestamp för när automationen får starta igen
 
+# --- GLOBAL HISTORIK FÖR GRAFER ---
+sensor_history = {
+    "temperature": [],
+    "light": [],
+    "pir": []
+}
+MAX_POINTS = 24  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
+
 def save_state():
     try:
         data = {
@@ -301,6 +309,33 @@ def start_curtain_thread(target, reason):
         print(f"Trigger: {reason} -> Moving to {target}%")
         threading.Thread(target=move_curtain_gradually, args=(target,), daemon=True).start()
 
+def history_collector_thread():
+    """Samlar data för graferna utan att störa resten av appen"""
+    global sensor_history
+    while True:
+        try:
+            timestamp = datetime.now().strftime("%H:%M")
+            
+            # Återanvänd din befintliga sensorlogik
+            lux = tsl_sensor.lux if IS_PI else 350.0
+            temp = 22.0  # Ersätt med din DHT-logik när du har den
+            motion_now = (GPIO.input(PIR_PIN) == 1) if IS_PI else False
+            
+            # Formatera för Recharts
+            sensor_history["temperature"].append({"time": timestamp, "value": temp})
+            sensor_history["light"].append({"time": timestamp, "value": round(lux, 1)})
+            sensor_history["pir"].append({"time": timestamp, "value": 1 if motion_now else 0})
+
+            # Håll listan lagom lång
+            for key in sensor_history:
+                if len(sensor_history[key]) > MAX_POINTS:
+                    sensor_history[key].pop(0)
+
+        except Exception as e:
+            print(f"History Collector Error: {e}")
+            
+        time.sleep(5)  # Vänta 5 minuter (300 sekunder)
+
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
     return "open" if curtain_state == 100 else "closed"
@@ -319,28 +354,9 @@ def get_bird_status(motion_now):
 # --- INTEGRATION ROUTES (För Webbapp gränssnitt) ---
 
 @app.route('/api/sensors', methods=['GET'])
-def get_sensor_data():
-    # Här kan du senare byta ut mock-data mot riktig data från dina sensorer
-    return jsonify({
-        "pir": [
-            {"time": "08:00", "value": 5},
-            {"time": "12:00", "value": 40},
-            {"time": "16:00", "value": 25},
-            {"time": "20:00", "value": 10}
-        ],
-        "temperature": [
-            {"time": "08:00", "value": 21},
-            {"time": "12:00", "value": 24},
-            {"time": "16:00", "value": 23},
-            {"time": "20:00", "value": 20}
-        ],
-        "light": [
-            {"time": "08:00", "value": 200},
-            {"time": "12:00", "value": 800},
-            {"time": "16:00", "value": 600},
-            {"time": "20:00", "value": 50}
-        ]
-    })
+def get_sensor_history():
+    """Returnerar insamlad historik till DataPage"""
+    return jsonify(sensor_history)
 
 @app.route('/status', methods=['GET'])
 def status():
@@ -504,11 +520,17 @@ if __name__ == '__main__':
     try:
 
         # Starta tråden som "daemon" så den dör när huvudprogrammet dör
+        # Tråd för knappar
         t1 = threading.Thread(target=button_control_thread, daemon=True)
         t1.start()
 
+        # Tråd för automatiska rutiner
         t2 = threading.Thread(target=automation_routine_thread, daemon=True)
         t2.start()
+
+        # Tråd för data insamling och visualisering i grafer 
+        t3 = threading.Thread(target=history_collector_thread, daemon=True)
+        t3.start()
 
         # Körs på port 5000 för att matcha hans frontend-anrop
         app.run(host='0.0.0.0', port=5000, debug=False)
