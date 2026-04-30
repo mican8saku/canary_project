@@ -33,6 +33,7 @@ is_moving = False
 light_state = False
 last_motion_at = datetime.now(timezone.utc).isoformat()
 MOTION_IDLE_THRESHOLD = 30 # Sekunder innan fågeln räknas som inaktiv
+camera_process = None
 
 # --- AUTOMATIONS-INSTÄLLNINGAR (Default-värden) ---
 auto_settings = {
@@ -511,26 +512,40 @@ def light_toggle():
 
 @app.route('/camera/snapshot', methods=['GET'])
 def camera_snapshot():
-    """Tar en unik bild och sparar i galleriet"""
-    # Skapa ett unikt filnamn baserat på tid, t.ex. capture_1714510000.jpg
+    global camera_process
     filename = f"capture_{int(time.time())}.jpg"
     filepath = UPLOAD_FOLDER / filename
     
-    if IS_PI:
-        try:
-            # -t 1000 ger kameran 1 sekund på sig att ställa in ljuset
-            subprocess.run(['rpicam-still', '-o', str(filepath), '-t', '1000', '--nopreview'], check=True)
-            
-            # Vi returnerar filnamnet så frontenden vet vad den heter
-            return jsonify({"ok": True, "filename": filename})
-        except Exception as e:
-            print(f"Kamerafel: {e}")
-            return jsonify({"ok": False, "error": str(e)}), 500
-    
-    return jsonify({"ok": True, "mock_url": "https://placehold.co/600x400"})
-    
-    # Om vi är på PC, skicka en placeholder
-    return jsonify({"ok": True, "mock_url": "https://placehold.co/600x400?text=Kamera+Mock"})
+    try:
+        # 1. Stoppa stream-processen om den körs
+        # Detta frigör kamerahårdvaran (imx708)
+        subprocess.run(['pkill', 'rpicam-vid'], check=False)
+        time.sleep(0.5) # Ge hårdvaran ett ögonblick att släppa taget
+
+        # 2. Ta bilden
+        print(f"Tar snapshot: {filename}")
+        subprocess.run([
+            'rpicam-still', 
+            '-o', str(filepath), 
+            '-t', '1000', 
+            '--nopreview',
+            '--immediate' # Tar bilden så fort som möjligt
+        ], check=True)
+
+        # 3. Starta om stream-processen i bakgrunden (valfritt om din stream-loop gör det själv)
+        # Om din stream sköts via en route, kommer den starta om vid nästa request.
+        
+        return jsonify({
+            "ok": True, 
+            "filename": filename,
+            "url": f"/static/gallery/{filename}"
+        })
+
+    except subprocess.CalledProcessError as e:
+        print(f"Kamera-fel: {e}")
+        return jsonify({"ok": False, "error": "Kameran upptagen"}), 500
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route('/api/gallery', methods=['GET'])
 def get_gallery():
