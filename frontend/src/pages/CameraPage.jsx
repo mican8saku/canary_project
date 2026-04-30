@@ -30,7 +30,6 @@ export default function CameraPage() {
 
   const handleCapture = async () => {
     await triggerSnapshot();
-    // Vänta 1.5 sekund så att hallonpajen hinner skriva klart filen
     setTimeout(fetchGallery, 1500);
   };
 
@@ -63,9 +62,8 @@ export default function CameraPage() {
         
         <LiveCameraView isCapturing={isCapturing} />
 
-        {/* NYTT: Kamerakontroll-kort inspirerat av LightControlCard */}
+        {/* Kamerakontroll-kort */}
         <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 shadow-2xl p-5 border border-white/5">
-          {/* Ljus-effekt/Glöd när vi tar bild */}
           <div
             className="absolute inset-0 opacity-40 pointer-events-none transition-opacity duration-500"
             style={{
@@ -86,7 +84,6 @@ export default function CameraPage() {
           </div>
 
           <div className="flex gap-3 relative z-10">
-            {/* CAPTURE-KNAPP */}
             <button
               onClick={handleCapture}
               disabled={isCapturing}
@@ -96,11 +93,10 @@ export default function CameraPage() {
                   : "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
               }`}
             >
-              {isCapturing ? <Loader2 className="h-4 h-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+              {isCapturing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
               {isCapturing ? "Processing..." : "Take Snapshot"}
             </button>
 
-            {/* RECORD-KNAPP (Inaktiv för nu) */}
             <button
               disabled={true}
               className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold bg-white/5 text-slate-500 border border-white/5 cursor-not-allowed"
@@ -156,7 +152,7 @@ export default function CameraPage() {
             </AnimatePresence>
           </div>
         )}
-      </section>
+      </motion.section>
     </div>
   );
 }
