@@ -3,12 +3,14 @@ import LiveCameraView from "../components/LiveCameraView";
 import { motion, AnimatePresence } from "framer-motion";
 import { Camera, Image as ImageIcon, Loader2, RefreshCcw } from "lucide-react";
 import { BASE_URL } from "../api/birdNestApi";
+import { useBirdNest } from "../hooks/useBirdNest";
 
 export default function CameraPage() {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isCapturing, setIsCapturing] = useState(false);
-  const { isCapturing } = useBirdNest();
+  
+  // Hämta allt från din hook
+  const { isCapturing, takeSnapshot: triggerSnapshot } = useBirdNest();
 
   const fetchGallery = async () => {
     try {
@@ -26,18 +28,11 @@ export default function CameraPage() {
     fetchGallery();
   }, []);
 
-  const takeSnapshot = async () => {
-    setIsCapturing(true);
-    try {
-      // 1. Pien tar en bild och sparar den i static/gallery
-      await fetch(`${BASE_URL}/camera/snapshot`);
-      // 2. Vänta lite så filen hinner skrivas, sen uppdatera listan
-      setTimeout(fetchGallery, 1000);
-    } catch (err) {
-      console.error("Capture failed:", err);
-    } finally {
-      setIsCapturing(false);
-    }
+  // En förenklad funktion som anropar hookens snapshot och sen uppdaterar galleriet
+  const handleCapture = async () => {
+    await triggerSnapshot();
+    // Vänta 1.5 sekund så att hallonpajen hinner skriva klart filen innan vi hämtar listan
+    setTimeout(fetchGallery, 1500);
   };
 
   return (
@@ -50,12 +45,12 @@ export default function CameraPage() {
           <h1 className="text-3xl font-bold text-foreground tracking-tight">BirdNest <span className="text-primary">Cam</span></h1>
         </div>
         <button 
-          onClick={takeSnapshot}
+          onClick={handleCapture}
           disabled={isCapturing}
           className="h-12 px-6 bg-primary text-primary-foreground rounded-2xl font-bold shadow-lg shadow-primary/20 flex items-center gap-2 active:scale-95 disabled:opacity-50 transition-all"
         >
           {isCapturing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-          Capture
+          {isCapturing ? "Capturing..." : "Capture"}
         </button>
       </div>
 
@@ -63,7 +58,7 @@ export default function CameraPage() {
       <section className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Live Feed</h2>
-          <span className="text-[10px] text-green-500 font-bold bg-green-500/10 px-2 py-0.5 rounded-full">Encrypted Connection</span>
+          <span className="text-[10px] text-green-500 font-bold bg-green-500/10 px-2 py-0.5 rounded-full">Secure Connection</span>
         </div>
         <LiveCameraView isCapturing={isCapturing} />
       </section>
@@ -94,7 +89,7 @@ export default function CameraPage() {
                   className="group relative aspect-square rounded-[2rem] overflow-hidden border border-border/50 bg-card shadow-sm"
                 >
                   <img 
-                    src={`${BASE_URL}/static/gallery/${filename}?t=${Date.now()}`} 
+                    src={`${BASE_URL}/static/gallery/${filename}?t=${filename}`} 
                     alt="Captured bird" 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
                   />
