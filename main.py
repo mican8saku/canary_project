@@ -511,17 +511,23 @@ def light_toggle():
 
 @app.route('/camera/snapshot', methods=['GET'])
 def camera_snapshot():
-    """Tar en bild och skickar direkt till appen"""
-    filename = "snapshot.jpg"
+    """Tar en unik bild och sparar i galleriet"""
+    # Skapa ett unikt filnamn baserat på tid, t.ex. capture_1714510000.jpg
+    filename = f"capture_{int(time.time())}.jpg"
     filepath = UPLOAD_FOLDER / filename
     
     if IS_PI:
         try:
-            # Använder rpicam-still (standard för Camera Module 3)
-            subprocess.run(['rpicam-still', '-o', str(filepath), '-t', '500', '--nopreview'], check=True)
-            return send_file(filepath, mimetype='image/jpeg')
+            # -t 1000 ger kameran 1 sekund på sig att ställa in ljuset
+            subprocess.run(['rpicam-still', '-o', str(filepath), '-t', '1000', '--nopreview'], check=True)
+            
+            # Vi returnerar filnamnet så frontenden vet vad den heter
+            return jsonify({"ok": True, "filename": filename})
         except Exception as e:
+            print(f"Kamerafel: {e}")
             return jsonify({"ok": False, "error": str(e)}), 500
+    
+    return jsonify({"ok": True, "mock_url": "https://placehold.co/600x400"})
     
     # Om vi är på PC, skicka en placeholder
     return jsonify({"ok": True, "mock_url": "https://placehold.co/600x400?text=Kamera+Mock"})
