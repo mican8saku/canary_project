@@ -77,8 +77,6 @@ export default function DataPage() {
     return rawData.slice(-(modes[viewMode] || 1440));
   };
 
-  // const timeTicks = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:59"];
-
   return (
     <div className="px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-8 space-y-6">
       
@@ -130,7 +128,6 @@ export default function DataPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
-                  ticks={viewMode === '24h' ? timeTicks : undefined}
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
@@ -164,7 +161,6 @@ export default function DataPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
-                  ticks={viewMode === '24h' ? timeTicks : undefined}
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
@@ -206,7 +202,6 @@ export default function DataPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
-                  ticks={viewMode === '24h' ? timeTicks : undefined}
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
