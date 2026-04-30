@@ -9,7 +9,6 @@ export default function CameraPage() {
   const [loading, setLoading] = useState(true);
   const [isCapturing, setIsCapturing] = useState(false);
 
-  // 1. Hämta listan på sparade bilder från Pien
   const fetchGallery = async () => {
     try {
       const response = await fetch(`${BASE_URL}/api/gallery`);
@@ -28,15 +27,11 @@ export default function CameraPage() {
     fetchGallery();
   }, []);
 
-  // 2. Ta en ny bild och spara den på Pien
   const takeSnapshot = async () => {
     setIsCapturing(true);
     try {
-      // Vi anropar snapshot-routen
       await fetch(`${BASE_URL}/camera/snapshot`);
-      // Eftersom bilden nu sparats i static/gallery på Pien, 
-      // uppdaterar vi listan för att visa den nya bilden
-      await fetchGallery();
+      await fetchGallery(); // Uppdatera galleriet efter att bilden sparats
     } catch (err) {
       console.error("Snapshot misslyckades:", err);
     } finally {
@@ -69,12 +64,12 @@ export default function CameraPage() {
         </button>
       </motion.div>
 
-      {/* LIVE VIEW */}
+      {/* LIVE VIEW - Denna sköter streamen själv nu */}
       <div className="bg-card rounded-[2.5rem] border border-border/60 shadow-sm overflow-hidden p-2">
          <LiveCameraView />
       </div>
 
-      {/* GALLERI - SPARADE BILDER PÅ PIEN */}
+      {/* GALLERI */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
@@ -93,7 +88,7 @@ export default function CameraPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            <AnimatePresence>
+            <AnimatePresence shadow-none>
               {images.map((filename) => (
                 <motion.div 
                   key={filename}
@@ -102,16 +97,14 @@ export default function CameraPage() {
                   animate={{ opacity: 1, scale: 1 }}
                   className="group relative aspect-square rounded-2xl overflow-hidden border border-border/50 bg-muted shadow-sm"
                 >
+                  {/* FIX HÄR: Vi pekar på den statiska filen, INTE streamen! */}
                   <img 
-                    key={key}
-                    src="[https://mjpeg.sanasto.fi/mjpg/video.mjpg](https://mjpeg.sanasto.fi/mjpg/video.mjpg)"
-                    alt="Live Bird Stream"
+                    src={`${BASE_URL}/static/gallery/${filename}`} 
+                    alt={filename} 
                     className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer" // Lägg till denna för att undvika HTTPS -> HTTP blockering
-                    onError={() => setError(true)}
+                    referrerPolicy="no-referrer"
                   />
                   
-                  {/* Tidsstämpel baserat på filnamnet om du vill (valfritt) */}
                   <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-opacity">
                     <span className="text-[9px] bg-black/40 backdrop-blur-md text-white px-2 py-0.5 rounded-full font-medium">
                        {filename.split('.')[0]}
