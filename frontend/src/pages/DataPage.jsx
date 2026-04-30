@@ -58,89 +58,116 @@ export default function DataPage() {
   }, []);
 
   return (
-    <div className="px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-8 space-y-6">
+  <div className="px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-8 space-y-6">
+    
+    {/* HEADER */}
+    <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
+      <div>
+        <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">Environmental</p>
+        <h1 className="text-2xl font-bold text-foreground tracking-tight">Sensor Data</h1>
+      </div>
       
-      {/* HEADER - Samma som Settings */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
-        <div>
-          <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">Environmental</p>
-          <h1 className="text-2xl font-bold text-foreground tracking-tight">Sensor Data</h1>
-        </div>
-        <button 
-          onClick={fetchData}
-          className="h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
-        >
-          <RefreshCcw className={`h-4 w-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
-        </button>
-      </motion.div>
+      {/* TIDSKONTROLL - Knappar för att ändra x-skalan */}
+      <div className="flex bg-muted p-1 rounded-xl border border-border/50">
+        {['1h', '6h', '24h'].map((mode) => (
+          <button
+            key={mode}
+            onClick={() => setViewMode(mode)}
+            className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
+              viewMode === mode 
+                ? "bg-background text-foreground shadow-sm" 
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {mode}
+          </button>
+        ))}
+      </div>
+    </motion.div>
 
-      {loading && !data ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground font-medium">Gathering intel...</p>
-        </div>
-      ) : error ? (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-6 flex flex-col items-center gap-2 text-destructive">
-          <AlertCircle className="h-8 w-8" />
-          <p className="font-semibold text-sm">Pi is Offline</p>
-          <p className="text-xs opacity-80 italic">Could not fetch telemetry</p>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          
-          {/* TEMPERATUR - Linjediagram */}
-          <ChartContainer title="Air Temperature" icon={Thermometer} colorClass="text-orange-500">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.temperature}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
-                <XAxis dataKey="time" hide />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} domain={['dataMin - 1', 'dataMax + 1']} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
-                  itemStyle={{ color: 'hsl(var(--foreground))' }}
-                />
-                <Line type="monotone" dataKey="value" stroke="hsl(var(--foreground))" strokeWidth={3} dot={{ r: 4, fill: '#f97316' }} activeDot={{ r: 6 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartContainer>
+    {loading && !data ? (
+      <div className="flex flex-col items-center justify-center py-20 gap-3">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/40" />
+        <p className="text-sm text-muted-foreground font-medium">Gathering intel...</p>
+      </div>
+    ) : error ? (
+      <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-6 flex flex-col items-center gap-2 text-destructive">
+        <AlertCircle className="h-8 w-8" />
+        <p className="font-semibold text-sm">Pi is Offline</p>
+      </div>
+    ) : (
+      <div className="space-y-8">
+        
+        {/* TEMPERATUR - Orange/Röd Gradient */}
+        <ChartContainer title="Air Temperature" icon={Thermometer} colorClass="text-orange-500">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={getFilteredData(data.temperature)}>
+              <defs>
+                <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+              <XAxis 
+                dataKey="time" 
+                stroke="hsl(var(--muted-foreground))" 
+                fontSize={10} 
+                tickLine={false} 
+                axisLine={false}
+                minTickGap={30}
+              />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} unit="°" />
+              <Tooltip 
+                contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="value" 
+                stroke="#f97316" 
+                strokeWidth={3} 
+                fillOpacity={1} 
+                fill="url(#colorTemp)" 
+                animationDuration={1000}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartContainer>
 
-          {/* LJUSNIVÅ - Ytdiagram */}
-          <ChartContainer title="Light Intensity" icon={Sun} colorClass="text-yellow-500">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.light}>
-                <defs>
-                  <linearGradient id="colorLight" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#eab308" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
-                <XAxis dataKey="time" hide />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
-                <Tooltip 
-                   contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
-                />
-                <Area type="monotone" dataKey="value" stroke="#eab308" fillOpacity={1} fill="url(#colorLight)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartContainer>
+        {/* LJUSNIVÅ */}
+        <ChartContainer title="Light Intensity" icon={Sun} colorClass="text-yellow-500">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={getFilteredData(data.light)}>
+              <defs>
+                <linearGradient id="colorLight" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#eab308" stopOpacity={0.2}/>
+                  <stop offset="95%" stopColor="#eab308" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+              <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} minTickGap={30} />
+              <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
+              <Area type="monotone" dataKey="value" stroke="#eab308" fillOpacity={1} fill="url(#colorLight)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartContainer>
 
-          {/* AKTIVITET - Stegdiagram */}
-          <ChartContainer title="Activity Log (PIR)" icon={Activity} colorClass="text-green-500">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data.pir}>
-                <XAxis dataKey="time" hide />
-                <YAxis hide />
-                <Tooltip 
-                   contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
-                />
-                <Area type="stepAfter" dataKey="value" stroke="#22c55e" fill="#22c55e" fillOpacity={0.1} strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartContainer>
+        {/* AKTIVITET */}
+        <ChartContainer title="Activity Log" icon={Activity} colorClass="text-green-500">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={getFilteredData(data.pir)}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+              <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} minTickGap={30} />
+              <YAxis hide />
+              <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
+              <Area type="stepAfter" dataKey="value" stroke="#22c55e" fill="#22c55e" fillOpacity={0.1} strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </ChartContainer>
 
-        </div>
-      )}
-    </div>
-  );
+      </div>
+    )}
+  </div>
+);
 }

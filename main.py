@@ -54,7 +54,7 @@ sensor_history = {
     "light": [],
     "pir": []
 }
-MAX_POINTS = 24  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
+MAX_POINTS = 144  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
 
 def save_state():
     try:
