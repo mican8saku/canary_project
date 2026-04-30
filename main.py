@@ -17,7 +17,11 @@ HISTORY_FILE = BASE_DIR / "sensor_history.json"
 
 app = Flask(__name__)
 # Krävs för att Webbapp ska kunna prata med Pien
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {
+    "origins": "*",
+    "methods": ["GET", "POST", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"]
+}})
 
 # --- KONFIGURATION & FILER ---
 UPLOAD_FOLDER = Path("static/gallery")
