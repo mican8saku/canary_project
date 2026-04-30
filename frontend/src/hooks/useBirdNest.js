@@ -34,11 +34,14 @@ export function useBirdNest() {
   const [lightOn, setLightOn] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [lux, setLux] = useState(null);
+  
 
   const fetchStatus = useCallback(async () => {
     try {
       const status = await getSystemStatus();
       setTemperature(status.temperature);
+      setLux(status.lux);
       setCurtainState(status.curtainState);
       setLightOn(status.lightOn); 
       setIsMoving(status.isMoving); 
@@ -114,6 +117,7 @@ export function useBirdNest() {
 
   return {
     temperature,
+    lux,
     curtainState,
     lightOn,
     isMoving,
