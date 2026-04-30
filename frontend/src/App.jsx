@@ -10,6 +10,7 @@ import Splash from './pages/Splash';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import CameraPage from './pages/CameraPage';
+import DataPage from './pages/DataPage';
 import Settings from './pages/Settings';
 
 const AuthenticatedApp = () => {
@@ -43,6 +44,7 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/camera" element={<CameraPage />} />
+        <Route path="/data" element={<DataPage />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<PageNotFound />} />
       </Route>

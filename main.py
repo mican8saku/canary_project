@@ -318,6 +318,30 @@ def get_bird_status(motion_now):
 
 # --- INTEGRATION ROUTES (För Webbapp gränssnitt) ---
 
+@app.route('/api/sensors', methods=['GET'])
+def get_sensor_data():
+    # Här kan du senare byta ut mock-data mot riktig data från dina sensorer
+    return jsonify({
+        "pir": [
+            {"time": "08:00", "value": 5},
+            {"time": "12:00", "value": 40},
+            {"time": "16:00", "value": 25},
+            {"time": "20:00", "value": 10}
+        ],
+        "temperature": [
+            {"time": "08:00", "value": 21},
+            {"time": "12:00", "value": 24},
+            {"time": "16:00", "value": 23},
+            {"time": "20:00", "value": 20}
+        ],
+        "light": [
+            {"time": "08:00", "value": 200},
+            {"time": "12:00", "value": 800},
+            {"time": "16:00", "value": 600},
+            {"time": "20:00", "value": 50}
+        ]
+    })
+
 @app.route('/status', methods=['GET'])
 def status():
     """Huvudstatus som servar både Dashboard och Diagnostics"""
