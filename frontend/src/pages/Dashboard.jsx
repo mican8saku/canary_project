@@ -46,23 +46,6 @@ export default function Dashboard() {
             onToggle={toggleLight} 
           />
         </motion.div>
-
-        {/* Kamera-kontrollkortet (Placerat underst) */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <FeaturedControlCard
-            name="Nest Camera"
-            room="Live Stream"
-            icon={Camera}
-            type="camera"
-            onActivate={takeSnapshot}
-            onDeactivate={() => {}} // Inaktiv för Record just nu
-            loading={isCapturing}
-          />
-        </motion.div>
       </div>
     </div>
   );
