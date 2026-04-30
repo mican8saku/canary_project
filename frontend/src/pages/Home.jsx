@@ -9,12 +9,14 @@ const hour = new Date().getHours();
 const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
 
 export default function Home() {
-  const { temperature, birdStatus, curtainState, lastMotionAt, lastMotionAtRaw, alerts, dismissAlert, loading, deviceOnline } = useBirdNest();
+  const { lux, temperature, birdStatus, curtainState, lastMotionAt, lastMotionAtRaw, alerts, dismissAlert, loading, deviceOnline } = useBirdNest();
 
   const birdActive = birdStatus === "active";
 
   const tempDisplay = temperature != null ? `${temperature}°C` : "--°C";
   const birdStatusDisplay = birdStatus ?? "Unknown";
+
+  const luxDisplay = lux != null ? `${lux} lx` : "-- lx";
 
   return (
     <div className="min-h-screen">
@@ -30,22 +32,34 @@ export default function Home() {
         </motion.div>
 
         {/* Sensor Strip */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08 }}
-          className="relative z-10 mt-6 flex items-center gap-3"
-        >
-          <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2.5">
-            <Thermometer className={`h-4 w-4 ${temperature >= 30 ? "text-orange-300" : "text-white/70"}`} />
-            <div>
-              <span className={`text-sm font-bold ${temperature != null && temperature >= 30 ? "text-orange-200" : "text-white"}`}>
-                {tempDisplay}
-              </span>
-              <span className="text-[11px] text-white/50 ml-1.5">Temperature</span>
-            </div>
-          </div>
-        </motion.div>
+<motion.div
+  initial={{ opacity: 0, y: 12 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.08 }}
+  className="relative z-10 mt-6 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar"
+>
+  {/* Temperature Tag */}
+  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2.5 whitespace-nowrap">
+    <Thermometer className={`h-4 w-4 ${temperature >= 30 ? "text-orange-300" : "text-white/70"}`} />
+    <div>
+      <span className={`text-sm font-bold ${temperature != null && temperature >= 30 ? "text-orange-200" : "text-white"}`}>
+        {tempDisplay}
+      </span>
+      <span className="text-[11px] text-white/50 ml-1.5">Temp</span>
+    </div>
+  </div>
+
+  {/* Lux Tag - NY! */}
+  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2.5 whitespace-nowrap">
+    <Sun className={`h-4 w-4 ${lux < 50 ? "text-blue-300" : "text-amber-300"}`} />
+    <div>
+      <span className="text-sm font-bold text-white">
+        {luxDisplay}
+      </span>
+      <span className="text-[11px] text-white/50 ml-1.5">Light</span>
+    </div>
+  </div>
+</motion.div>
       </div>
 
       {/* Offline / error banner */}
