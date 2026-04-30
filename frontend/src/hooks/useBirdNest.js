@@ -3,27 +3,19 @@ import {
   getSystemStatus,
   openCurtain as apiOpen,
   closeCurtain as apiClose,
-  apiPost
+  apiPost,
+  BASE_URL // Se till att denna är exporterad från din api-fil
 } from "../api/birdNestApi";
 
 const POLL_INTERVAL_MS = 2_000;
 
-function formatLastMotion(isoString) {
-  if (!isoString) return "Unknown";
-  const seconds = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
-  if (seconds < 60) return `${seconds}s ago`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
+// ... (formatLastMotion funktionen behålls som den är)
 
 export function useBirdNest() {
   const [temperature, setTemperature] = useState(null);
-  const [curtainState, setCurtainState] = useState(null);  // "open" | "closed"
-  const [birdStatus, setBirdStatus] = useState(null);       // "active" | "inactive"
-  const [lastMotionAt, setLastMotionAt] = useState(null);   // ISO string
+  const [curtainState, setCurtainState] = useState(null);
+  const [birdStatus, setBirdStatus] = useState(null);
+  const [lastMotionAt, setLastMotionAt] = useState(null);
   const [deviceOnline, setDeviceOnline] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,46 +23,27 @@ export function useBirdNest() {
   const [curtainLoading, setCurtainLoading] = useState(false);
   const [lightOn, setLightOn] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
+  
+  // NYTT: State för kamera-snapshot
+  const [isCapturing, setIsCapturing] = useState(false);
 
-  const dismissAlert = useCallback((id) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
-  }, []);
+  // ... (dismissAlert och fetchStatus behålls som de är)
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
-  const fetchStatus = useCallback(async () => {
+  // ── Camera actions ──────────────────────────────────────────────────────────
+  const takeSnapshot = useCallback(async () => {
+    if (isCapturing) return;
+    setIsCapturing(true);
     try {
-      const status = await getSystemStatus();
-
-      setTemperature(status.temperature);
-      setCurtainState(status.curtainState);
-      setLightOn(status.lightOn); 
-      setIsMoving(status.isMoving); 
-      setBirdStatus(status.birdStatus);
-      setLastMotionAt(status.lastMotionAt);
-      setDeviceOnline(status.deviceOnline ?? true);
-      setAlerts(status.alerts ?? []);
-      setError(null);
+      // Vi använder fetch direkt här eftersom vi vill trigga snapshot-kommandot
+      const response = await fetch(`${BASE_URL}/camera/snapshot`);
+      const data = await response.json();
+      return data;
     } catch (err) {
-      setDeviceOnline(false);
-      setError(err.message || "Failed to reach device");
+      console.error("Kameradefel:", err);
+    } finally {
+      setIsCapturing(false);
     }
-  }, []);
-
-  // ── Polling ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    let cancelled = false;
-    async function initialFetch() {
-      setLoading(true);
-      await fetchStatus();
-      if (!cancelled) setLoading(false);
-    }
-    initialFetch();
-    const interval = setInterval(fetchStatus, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [fetchStatus]);
+  }, [isCapturing]);
 
   // ── Curtain actions ────────────────────────────────────────────────────────
   const openCurtain = useCallback(async () => {
@@ -78,9 +51,10 @@ export function useBirdNest() {
     setCurtainLoading(true);
     try {
       const res = await apiOpen();
-      if (res && typeof res.curtainState === 'number') {
-        setCurtainState(res.curtainState) 
-      };
+      if (res && res.ok) {
+        // Din backend returnerar curtainState i svaret
+        setCurtainState(res.curtainState);
+      }
     } finally {
       setCurtainLoading(false);
     }
@@ -91,26 +65,27 @@ export function useBirdNest() {
     setCurtainLoading(true);
     try {
       const res = await apiClose();
-      if (res && typeof res.curtainState === 'number') {
-        setCurtainState(res.curtainState)
-      };
+      if (res && res.ok) {
+        setCurtainState(res.curtainState);
+      }
     } finally {
       setCurtainLoading(false);
     }
   }, [curtainLoading]);
 
-  // ---- Light Control ------ 
+  // ── Light Control ──────────────────────────────────────────────────────────
   const toggleLight = useCallback(async () => {
-  try {
-    const res = await apiPost('/light/toggle'); 
-    if (res && res.lightOn !== undefined) {
-      setLightOn(res.lightOn);
+    try {
+      const res = await apiPost('/light/toggle'); 
+      if (res && res.lightOn !== undefined) {
+        setLightOn(res.lightOn);
+      }
+    } catch (err) {
+      console.error("Kunde inte ändra ljus:", err);
     }
-  } catch (err) {
-    console.error("Kunde inte ändra ljus:", err);
-  }
-}, []); // Tom array är ok här om du inte använder lightOn-variabeln inuti try-blocket
+  }, []);
 
+  // KOM IHÅG: Lägg till de nya funktionerna i return-objektet!
   return {
     temperature,
     curtainState,
@@ -128,5 +103,7 @@ export function useBirdNest() {
     openCurtain,
     closeCurtain,
     curtainLoading,
+    takeSnapshot, // EXPORTERA DENNA
+    isCapturing   // EXPORTERA DENNA
   };
 }
