@@ -9,7 +9,7 @@ const hour = new Date().getHours();
 const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
 
 export default function Home() {
-  const { lux, temperature, birdStatus, curtainState, lastMotionAt, lastMotionAtRaw, alerts, dismissAlert, loading, deviceOnline } = useBirdNest();
+  const { lux, temperature, birdStatus, curtainState, lastMotionAt, lastMotionAtRaw, lightOn, alerts, dismissAlert, loading, deviceOnline } = useBirdNest();
 
   const birdActive = birdStatus === "active";
 
@@ -136,21 +136,19 @@ export default function Home() {
 
          {/* LIGHTS - Ny knapp som går till dashboard */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.19 }}>
-            <Link
-              to="/dashboard"
-              className="relative block bg-card border border-border/60 rounded-2xl p-5 active:scale-95 transition-transform shadow-sm"
-            >
-              {/* Här kan du styra statusen baserat på din LED-variabel om du har en, annars kör vi en default */}
-              <span className="absolute top-3 right-3 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                Smart
-              </span>
-              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-3 shadow-sm">
-                <Sun className="h-5 w-5 text-white" />
-              </div>
-              <p className="text-sm font-bold text-foreground">Lights</p>
-              <p className="text-xs text-muted-foreground mt-0.5">LED & Lux settings</p>
-            </Link>
-          </motion.div>
+      <Link to="/dashboard" className="relative block bg-card border border-border/60 rounded-2xl p-5 active:scale-95 transition-transform shadow-sm">
+        <span className={`absolute top-3 right-3 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+          lightOn ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"
+        }`}>
+          {lightOn ? "On" : "Off"}
+        </span>
+        <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mb-3 shadow-sm">
+          <Sun className="h-5 w-5 text-white" />
+        </div>
+        <p className="text-sm font-bold text-foreground">Lights</p>
+        <p className="text-xs text-muted-foreground mt-0.5">LED & Lux settings</p>
+      </Link>
+    </motion.div>
 
           {/* CAMERA */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
