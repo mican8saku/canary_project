@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Blinds, Camera, Thermometer, Bird, Activity } from "lucide-react";
+import { Blinds, Camera, Thermometer, Bird, Activity, Sun } from "lucide-react";
 import AlertBanner from "../components/AlertBanner";
 import { useBirdNest } from "../hooks/useBirdNest";
 import { WifiOff } from "lucide-react";
@@ -120,6 +120,25 @@ export default function Home() {
             </Link>
           </motion.div>
 
+         {/* LIGHTS - Ny knapp som går till dashboard */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.19 }}>
+            <Link
+              to="/dashboard"
+              className="relative block bg-card border border-border/60 rounded-2xl p-5 active:scale-95 transition-transform shadow-sm"
+            >
+              {/* Här kan du styra statusen baserat på din LED-variabel om du har en, annars kör vi en default */}
+              <span className="absolute top-3 right-3 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                Smart
+              </span>
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-3 shadow-sm">
+                <Sun className="h-5 w-5 text-white" />
+              </div>
+              <p className="text-sm font-bold text-foreground">Lights</p>
+              <p className="text-xs text-muted-foreground mt-0.5">LED & Lux settings</p>
+            </Link>
+          </motion.div>
+
+          {/* CAMERA */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
             <Link
               to="/camera"
