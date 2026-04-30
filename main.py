@@ -47,6 +47,12 @@ last_motion_time = time.time()
 auto_light_active = False
 manual_override_until = 0  # Timestamp för när automationen får starta igen
 
+latest_sensor_data = {
+    "temp": 22.0,
+    "lux": 0.0,
+    "last_updated": None
+}
+
 # --- GLOBAL HISTORIK FÖR GRAFER ---
 sensor_history = {
     "temperature": [],
@@ -333,64 +339,75 @@ def start_curtain_thread(target, reason):
         threading.Thread(target=move_curtain_gradually, args=(target,), daemon=True).start()
 
 def history_collector_thread():
-    global sensor_history
-    print("Starting Optimized History Collector...")
+    global sensor_history, latest_sensor_data, last_motion_at
+    print("Starting History Collector & Sensor Monitor...")
     
     motion_accumulator = 0
     loop_count = 0
 
     while True:
         try:
-            # --- SNABB LOOP (Var 10:e sekund) ---
-            # Kolla rörelse ofta för att inte missa fågelns aktivitet
+            # --- 1. LÄS SENSORER (Var 10:e sekund) ---
+            current_temp = latest_sensor_data["temp"] # Behåll gammalt värde som fallback
+            current_lux = 350.0
+            motion_now = False
+
             if IS_PI:
-                if GPIO.input(PIR_PIN) == 1:
-                    motion_accumulator += 1
-            
+                # Läs Ljus
+                try:
+                    current_lux = round(tsl_sensor.lux, 1)
+                except: pass
+
+                # Läs Rörelse
+                motion_now = (GPIO.input(PIR_PIN) == 1)
+                if motion_now:
+                    last_motion_at = datetime.now().isoformat()
+                    motion_accumulator += 1 # För compounding-grafen
+
+                # Läs Temperatur (DHT11 är petig, läs var 10:e sek är lagom)
+                try:
+                    t = dht_device.temperature
+                    if t is not None:
+                        current_temp = t
+                except:
+                    pass # Behåll senaste lyckade läsningen
+            else:
+                # Mock-data för testmiljö
+                current_lux = 350.0
+                motion_now = False
+
+            # Uppdatera globala variabler för blixtsnabb /status
+            latest_sensor_data["temp"] = current_temp
+            latest_sensor_data["lux"] = current_lux
+            latest_sensor_data["motion_now"] = motion_now
+            latest_sensor_data["last_updated"] = datetime.now().strftime("%H:%M:%S")
+
+            # --- 2. LOGGA TILL HISTORIK (Varje minut: loop_count 6 * 10s) ---
             loop_count += 1
-
-            # --- LOGGNINGS-INTERVALL (Varje minut: 6 * 10s) ---
             if loop_count >= 6:
-                now = datetime.now()
-                timestamp = now.strftime("%H:%M")
+                timestamp = datetime.now().strftime("%H:%M")
 
-                # Hämta temperatur
-                if IS_PI:
-                    try:
-                        temp = dht_device.temperature
-                        current_temp = temp if temp is not None else 22.0
-                    except:
-                        current_temp = 22.0
-                else:
-                    current_temp = 22.0
-
-                # Hämta ljus
-                lux = tsl_sensor.lux if IS_PI else 350.0
-                current_lux = round(lux, 1)
-
-                # Spara data
+                # Spara till minnet
                 sensor_history["temperature"].append({"time": timestamp, "value": current_temp})
                 sensor_history["light"].append({"time": timestamp, "value": current_lux})
-                # PIR-värdet blir nu ett tal mellan 0 och 6 (hur aktiv fågeln var denna minut)
                 sensor_history["pir"].append({"time": timestamp, "value": motion_accumulator})
 
-                # Håll listan inom MAX_POINTS (1440 punkter = 24 timmar om vi loggar varje minut)
-                MAX_24H_POINTS = 1440
+                # Håll 24h historik (1440 punkter)
                 for key in sensor_history:
-                    if len(sensor_history[key]) > MAX_24H_POINTS:
+                    if len(sensor_history[key]) > 1440:
                         sensor_history[key].pop(0)
 
-                # Spara till fil så vi inte tappar data vid omstart
+                # Spara till fil (sensor_history.json)
                 save_history()
 
-                # Nollställ mätare för nästa minut
+                # Nollställ för nästa minut
                 motion_accumulator = 0
                 loop_count = 0
 
         except Exception as e:
-            print(f"Error in history thread: {e}")
+            print(f"Critical error in history thread: {e}")
 
-        time.sleep(10) # Vänta 10 sekunder mellan varje PIR-koll
+        time.sleep(10)
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
@@ -416,29 +433,27 @@ def get_sensor_history():
 
 @app.route('/status', methods=['GET'])
 def status():
-    """Huvudstatus som servar både Dashboard och Diagnostics"""
-    lux = tsl_sensor.lux if IS_PI else 350.0
-    motion_now = GPIO.input(PIR_PIN) == 1 if IS_PI else False
-    
     global last_motion_at
-    if motion_now:
-        last_motion_at = datetime.now().isoformat()
-
+    
+    # Beräkna override-tid för säkerhets skull
+    time_left_override = max(0, int(manual_override_until - time.time()))
+    
     return jsonify({
         "ok": True,
         "isPi": IS_PI,
         "deviceOnline": True,
         "stateFileExists": STATE_FILE.exists(),
-        "temperature": 22.0,
+        "temperature": latest_sensor_data["temp"],  # Från tråden
         "curtainState": curtain_state, 
-        "birdStatus": get_bird_status(motion_now),
+        "birdStatus": get_bird_status(latest_sensor_data["motion_now"]),
         "lastMotionAt": last_motion_at,
-        "light": round(lux, 2),
+        "light": latest_sensor_data["lux"],        # Från tråden
         "tempSensor": "ok" if IS_PI else "mock",
         "motorControl": "OK" if IS_PI else "mock",
-        # --- NYA FÄLT HÄR ---
         "lightOn": light_state,
-        "isMoving": is_moving
+        "isMoving": is_moving,
+        "manual_override": time_left_override > 0,
+        "lastUpdate": latest_sensor_data["last_updated"]
     })
 
 @app.route('/settings/automation', methods=['POST', 'GET'])

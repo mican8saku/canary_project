@@ -43,10 +43,21 @@ export default function DataPage() {
 
   const getFilteredData = (rawData) => {
     if (!rawData) return [];
-    if (viewMode === '24h') return rawData;
-    if (viewMode === '6h') return rawData.slice(-36); 
-    if (viewMode === '1h') return rawData.slice(-6);  
-    return rawData;
+    
+    switch (viewMode) {
+      case '1h':
+        return rawData.slice(-60);    // 60 minuter
+      case '3h':
+        return rawData.slice(-180);   // 3 * 60 minuter
+      case '6h':
+        return rawData.slice(-360);   // 6 * 60 minuter
+      case '12h':
+        return rawData.slice(-720);   // 12 * 60 minuter
+      case '24h':
+        return rawData.slice(-1440);  // 24 * 60 minuter
+      default:
+        return rawData;
+    }
   };
 
   const fetchData = () => {
@@ -80,8 +91,9 @@ export default function DataPage() {
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Sensor Data</h1>
         </div>
         
+        {/* TIDSKONTROLL */}
         <div className="flex bg-muted p-1 rounded-xl border border-border/50">
-          {['1h', '6h', '24h'].map((mode) => (
+          {['1h', '3h', '6h', '12h', '24h'].map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
@@ -122,6 +134,7 @@ export default function DataPage() {
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
+                  minTickGap={50}
                 />
                 <YAxis hide domain={[0, 'auto']} />
                 <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
@@ -156,6 +169,7 @@ export default function DataPage() {
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false}
+                  minTickGap={50}
                 />
                 <YAxis 
                   domain={[15, 35]} 
@@ -198,6 +212,7 @@ export default function DataPage() {
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
+                  minTickGap={50}
                 />
                 <YAxis 
                   domain={[0, 1000]} 
