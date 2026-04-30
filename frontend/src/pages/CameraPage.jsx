@@ -103,9 +103,12 @@ export default function CameraPage() {
                   className="group relative aspect-square rounded-2xl overflow-hidden border border-border/50 bg-muted shadow-sm"
                 >
                   <img 
-                    src={`${BASE_URL}/static/gallery/${filename}`} 
-                    alt={filename} 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                    key={key}
+                    src="[https://mjpeg.sanasto.fi/mjpg/video.mjpg](https://mjpeg.sanasto.fi/mjpg/video.mjpg)"
+                    alt="Live Bird Stream"
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer" // Lägg till denna för att undvika HTTPS -> HTTP blockering
+                    onError={() => setError(true)}
                   />
                   
                   {/* Tidsstämpel baserat på filnamnet om du vill (valfritt) */}
