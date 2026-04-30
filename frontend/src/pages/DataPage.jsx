@@ -77,7 +77,7 @@ export default function DataPage() {
     return rawData.slice(-(modes[viewMode] || 1440));
   };
 
-  const timeTicks = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:59"];
+  // const timeTicks = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:59"];
 
   return (
     <div className="px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-8 space-y-6">
@@ -126,7 +126,7 @@ export default function DataPage() {
           
           <ChartContainer title="Bird Activity" icon={Activity} colorClass="text-green-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart key={viewMode} data={getFilteredData(data.pir)}>
+              <AreaChart data={getFilteredData(data.pir)}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
@@ -154,7 +154,7 @@ export default function DataPage() {
 
           <ChartContainer title="Air Temperature" icon={Thermometer} colorClass="text-orange-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart key={viewMode} data={getFilteredData(data.temperature)}>
+              <AreaChart data={getFilteredData(data.temperature)}>
                 <defs>
                   <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#f97316" stopOpacity={0.4}/>
@@ -196,7 +196,7 @@ export default function DataPage() {
 
           <ChartContainer title="Light Intensity" icon={Sun} colorClass="text-yellow-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart key={viewMode} data={getFilteredData(data.light)}>
+              <AreaChart data={getFilteredData(data.light)}>
                 <defs>
                   <linearGradient id="colorLight" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#eab308" stopOpacity={0.2}/>
