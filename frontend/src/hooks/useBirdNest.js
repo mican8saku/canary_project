@@ -41,7 +41,7 @@ export function useBirdNest() {
     try {
       const status = await getSystemStatus();
       setTemperature(status.temperature);
-      setLux(status.lux);
+      setLux(status.light);
       setCurtainState(status.curtainState);
       setLightOn(status.lightOn); 
       setIsMoving(status.isMoving); 
