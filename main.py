@@ -54,7 +54,7 @@ sensor_history = {
     "light": [],
     "pir": []
 }
-MAX_POINTS = 24  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
+MAX_POINTS = 144  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
 
 def save_state():
     try:
@@ -310,31 +310,50 @@ def start_curtain_thread(target, reason):
         threading.Thread(target=move_curtain_gradually, args=(target,), daemon=True).start()
 
 def history_collector_thread():
-    """Samlar data för graferna utan att störa resten av appen"""
+    """
+    Bakgrundstråd som samlar in sensordata med jämna mellanrum 
+    för att populera graferna i frontend.
+    """
     global sensor_history
+    print("Staring History Collector Thread...")
+
     while True:
         try:
-            timestamp = datetime.now().strftime("%H:%M")
-            
-            # Återanvänd din befintliga sensorlogik
-            lux = tsl_sensor.lux if IS_PI else 350.0
-            temp = 22.0  # Ersätt med din DHT-logik när du har den
-            motion_now = (GPIO.input(PIR_PIN) == 1) if IS_PI else False
-            
-            # Formatera för Recharts
-            sensor_history["temperature"].append({"time": timestamp, "value": temp})
-            sensor_history["light"].append({"time": timestamp, "value": round(lux, 1)})
-            sensor_history["pir"].append({"time": timestamp, "value": 1 if motion_now else 0})
+            # 1. Hämta aktuell tid för X-axeln
+            now = datetime.now()
+            timestamp = now.strftime("%H:%M")
 
-            # Håll listan lagom lång
+            # 2. Samla in data (återanvänder din befintliga logik)
+            # Temperatur (Ersätt 22.0 med din faktiska sensor-läsning när den är klar)
+            current_temp = 22.0 
+            
+            # Ljusnivå
+            lux = tsl_sensor.lux if IS_PI else 350.0
+            current_lux = round(lux, 1)
+
+            # Rörelse (PIR)
+            motion_now = (GPIO.input(PIR_PIN) == 1) if IS_PI else False
+            current_pir = 1 if motion_now else 0
+
+            # 3. Uppdatera historiken
+            sensor_history["temperature"].append({"time": timestamp, "value": current_temp})
+            sensor_history["light"].append({"time": timestamp, "value": current_lux})
+            sensor_history["pir"].append({"time": timestamp, "value": current_pir})
+
+            # 4. Håll listan inom MAX_POINTS för att inte äta upp RAM
             for key in sensor_history:
                 if len(sensor_history[key]) > MAX_POINTS:
                     sensor_history[key].pop(0)
 
+            # print(f"History Logged: {timestamp} - T:{current_temp} L:{current_lux} P:{current_pir}")
+
         except Exception as e:
-            print(f"History Collector Error: {e}")
-            
-        time.sleep(5)  # Vänta 5 minuter (300 sekunder)
+            # Logga fel men låt tråden fortsätta köra
+            print(f"Critical Error in History Collector: {e}")
+
+        # 5. Vänta i 10 minuter (600 sekunder) till nästa mätning
+        # Tips: Under testning kan du ändra detta till 10 för att se graferna fyllas snabbt
+        time.sleep(30)
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
