@@ -10,7 +10,6 @@ from pathlib import Path
 from datetime import datetime, timezone
 from flask import Flask, jsonify, send_file, request, Response
 from flask_cors import CORS
-from pathlib import Path
 
 BASE_DIR = Path(__file__).parent.absolute()
 STATE_FILE = BASE_DIR / "state.json"
@@ -21,7 +20,6 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 # --- KONFIGURATION & FILER ---
 UPLOAD_FOLDER = Path("static/gallery")
-STATE_FILE = Path("state.json")
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 # --- APP STATE (Minne vid omstart) ---
@@ -325,7 +323,15 @@ def history_collector_thread():
 
             # 2. Samla in data (återanvänder din befintliga logik)
             # Temperatur (Ersätt 22.0 med din faktiska sensor-läsning när den är klar)
-            current_temp = 22.0 
+            if IS_PI:
+                try:
+                    current_temp = dht_device.temperature
+                    if current_temp is None:
+                        current_temp = 22.0
+                except:
+                    current_temp = 22.0
+            else:
+                current_temp = 22.0
             
             # Ljusnivå
             lux = tsl_sensor.lux if IS_PI else 350.0
@@ -385,7 +391,6 @@ def status():
     
     global last_motion_at
     if motion_now:
-        from datetime import datetime
         last_motion_at = datetime.now().isoformat()
 
     return jsonify({
@@ -420,6 +425,7 @@ def update_automation_settings():
 
 @app.route('/curtain/open', methods=['POST'])
 def curtain_open():
+    global manual_override_until
     if is_moving:
         return jsonify({"ok": False, "error": "Already moving"}), 400
     
@@ -430,6 +436,7 @@ def curtain_open():
 
 @app.route('/curtain/close', methods=['POST'])
 def curtain_close():
+    global manual_override_until
     if is_moving:
         return jsonify({"ok": False, "error": "Already moving"}), 400
 
