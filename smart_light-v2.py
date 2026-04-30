@@ -4,7 +4,7 @@ import neopixel
 import time
 
 # --- Inställningar ---
-LUX_THRESHOLD = 30.0
+LUX_THRESHOLD = 10.0
 PIXEL_PIN = board.D12
 NUM_PIXELS = 8 
 

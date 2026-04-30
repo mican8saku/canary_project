@@ -6,6 +6,7 @@ const navItems = [
   { path: "/",          label: "Home",     icon: Home },
   { path: "/dashboard", label: "Controls", icon: LayoutDashboard },
   { path: "/camera",    label: "Camera",   icon: Camera },
+  { path: "/data",      label: "Data",     icon: ChartSpline },
   { path: "/settings",  label: "Settings", icon: Settings },
 ];
 
