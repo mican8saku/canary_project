@@ -522,6 +522,18 @@ def camera_snapshot():
     # Om vi är på PC, skicka en placeholder
     return jsonify({"ok": True, "mock_url": "https://placehold.co/600x400?text=Kamera+Mock"})
 
+@app.route('/api/gallery', methods=['GET'])
+def get_gallery():
+    """Returnerar en lista på alla sparade bilder i galleriet"""
+    try:
+        # Lista alla .jpg och .png filer i mappen
+        images = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith(('.jpg', '.jpeg', '.png'))]
+        # Sortera så nyaste bilderna kommer först (baserat på filnamn eller datum)
+        images.sort(reverse=True)
+        return jsonify({"ok": True, "images": images})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
 @app.route('/led', methods=['POST'])
 def control_led():
     """Tänder/släcker lampan baserat på JSON-data: {"on": true/false}"""
