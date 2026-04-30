@@ -13,6 +13,7 @@ from flask_cors import CORS
 
 BASE_DIR = Path(__file__).parent.absolute()
 STATE_FILE = BASE_DIR / "state.json"
+HISTORY_FILE = BASE_DIR / "sensor_history.json"
 
 app = Flask(__name__)
 # Krävs för att Webbapp ska kunna prata med Pien
@@ -46,13 +47,19 @@ last_motion_time = time.time()
 auto_light_active = False
 manual_override_until = 0  # Timestamp för när automationen får starta igen
 
+latest_sensor_data = {
+    "temp": 22.0,
+    "lux": 0.0,
+    "last_updated": None
+}
+
 # --- GLOBAL HISTORIK FÖR GRAFER ---
 sensor_history = {
     "temperature": [],
     "light": [],
     "pir": []
 }
-MAX_POINTS = 144  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
+MAX_POINTS = 1440  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
 
 def save_state():
     try:
@@ -81,6 +88,30 @@ def load_state():
             print(f"Load error: {e}")
 
 load_state()
+
+def save_history():
+    try:
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(sensor_history, f)
+    except Exception as e:
+        print(f"Error saving history: {e}")
+
+def load_history():
+    global sensor_history
+    if HISTORY_FILE.exists():
+        try:
+            with open(HISTORY_FILE, 'r') as f:
+                data = json.load(f)
+                # Säkerställ att alla nycklar finns
+                for key in ["temperature", "light", "pir"]:
+                    if key in data:
+                        sensor_history[key] = data[key]
+            print("History loaded from disk.")
+        except Exception as e:
+            print(f"Error loading history: {e}")
+
+# Kalla på denna i början av programmet (t.ex. efter load_state())
+load_history()
 
 # --- HÅRDVARA SETUP ---
 try:
@@ -308,58 +339,75 @@ def start_curtain_thread(target, reason):
         threading.Thread(target=move_curtain_gradually, args=(target,), daemon=True).start()
 
 def history_collector_thread():
-    """
-    Bakgrundstråd som samlar in sensordata med jämna mellanrum 
-    för att populera graferna i frontend.
-    """
-    global sensor_history
-    print("Staring History Collector Thread...")
+    global sensor_history, latest_sensor_data, last_motion_at
+    print("Starting History Collector & Sensor Monitor...")
+    
+    motion_accumulator = 0
+    loop_count = 0
 
     while True:
         try:
-            # 1. Hämta aktuell tid för X-axeln
-            now = datetime.now()
-            timestamp = now.strftime("%H:%M")
+            # --- 1. LÄS SENSORER (Var 10:e sekund) ---
+            current_temp = latest_sensor_data["temp"] # Behåll gammalt värde som fallback
+            current_lux = 350.0
+            motion_now = False
 
-            # 2. Samla in data (återanvänder din befintliga logik)
-            # Temperatur (Ersätt 22.0 med din faktiska sensor-läsning när den är klar)
             if IS_PI:
+                # Läs Ljus
                 try:
-                    current_temp = dht_device.temperature
-                    if current_temp is None:
-                        current_temp = 22.0
+                    current_lux = round(tsl_sensor.lux, 1)
+                except: pass
+
+                # Läs Rörelse
+                motion_now = (GPIO.input(PIR_PIN) == 1)
+                if motion_now:
+                    last_motion_at = datetime.now().isoformat()
+                    motion_accumulator += 1 # För compounding-grafen
+
+                # Läs Temperatur (DHT11 är petig, läs var 10:e sek är lagom)
+                try:
+                    t = dht_device.temperature
+                    if t is not None:
+                        current_temp = t
                 except:
-                    current_temp = 22.0
+                    pass # Behåll senaste lyckade läsningen
             else:
-                current_temp = 22.0
-            
-            # Ljusnivå
-            lux = tsl_sensor.lux if IS_PI else 350.0
-            current_lux = round(lux, 1)
+                # Mock-data för testmiljö
+                current_lux = 350.0
+                motion_now = False
 
-            # Rörelse (PIR)
-            motion_now = (GPIO.input(PIR_PIN) == 1) if IS_PI else False
-            current_pir = 1 if motion_now else 0
+            # Uppdatera globala variabler för blixtsnabb /status
+            latest_sensor_data["temp"] = current_temp
+            latest_sensor_data["lux"] = current_lux
+            latest_sensor_data["motion_now"] = motion_now
+            latest_sensor_data["last_updated"] = datetime.now().strftime("%H:%M:%S")
 
-            # 3. Uppdatera historiken
-            sensor_history["temperature"].append({"time": timestamp, "value": current_temp})
-            sensor_history["light"].append({"time": timestamp, "value": current_lux})
-            sensor_history["pir"].append({"time": timestamp, "value": current_pir})
+            # --- 2. LOGGA TILL HISTORIK (Varje minut: loop_count 6 * 10s) ---
+            loop_count += 1
+            if loop_count >= 6:
+                timestamp = datetime.now().strftime("%H:%M")
 
-            # 4. Håll listan inom MAX_POINTS för att inte äta upp RAM
-            for key in sensor_history:
-                if len(sensor_history[key]) > MAX_POINTS:
-                    sensor_history[key].pop(0)
+                # Spara till minnet
+                sensor_history["temperature"].append({"time": timestamp, "value": current_temp})
+                sensor_history["light"].append({"time": timestamp, "value": current_lux})
+                sensor_history["pir"].append({"time": timestamp, "value": motion_accumulator})
 
-            # print(f"History Logged: {timestamp} - T:{current_temp} L:{current_lux} P:{current_pir}")
+                # Håll 24h historik (1440 punkter)
+                for key in sensor_history:
+                    if len(sensor_history[key]) > 1440:
+                        sensor_history[key].pop(0)
+
+                # Spara till fil (sensor_history.json)
+                save_history()
+
+                # Nollställ för nästa minut
+                motion_accumulator = 0
+                loop_count = 0
 
         except Exception as e:
-            # Logga fel men låt tråden fortsätta köra
-            print(f"Critical Error in History Collector: {e}")
+            print(f"Critical error in history thread: {e}")
 
-        # 5. Vänta i 10 minuter (600 sekunder) till nästa mätning
-        # Tips: Under testning kan du ändra detta till 10 för att se graferna fyllas snabbt
-        time.sleep(30)
+        time.sleep(10)
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
@@ -385,29 +433,27 @@ def get_sensor_history():
 
 @app.route('/status', methods=['GET'])
 def status():
-    """Huvudstatus som servar både Dashboard och Diagnostics"""
-    lux = tsl_sensor.lux if IS_PI else 350.0
-    motion_now = GPIO.input(PIR_PIN) == 1 if IS_PI else False
-    
     global last_motion_at
-    if motion_now:
-        last_motion_at = datetime.now().isoformat()
-
+    
+    # Beräkna override-tid för säkerhets skull
+    time_left_override = max(0, int(manual_override_until - time.time()))
+    
     return jsonify({
         "ok": True,
         "isPi": IS_PI,
         "deviceOnline": True,
         "stateFileExists": STATE_FILE.exists(),
-        "temperature": 22.0,
+        "temperature": latest_sensor_data["temp"],  # Från tråden
         "curtainState": curtain_state, 
-        "birdStatus": get_bird_status(motion_now),
+        "birdStatus": get_bird_status(latest_sensor_data["motion_now"]),
         "lastMotionAt": last_motion_at,
-        "light": round(lux, 2),
+        "light": latest_sensor_data["lux"],        # Från tråden
         "tempSensor": "ok" if IS_PI else "mock",
         "motorControl": "OK" if IS_PI else "mock",
-        # --- NYA FÄLT HÄR ---
         "lightOn": light_state,
-        "isMoving": is_moving
+        "isMoving": is_moving,
+        "manual_override": time_left_override > 0,
+        "lastUpdate": latest_sensor_data["last_updated"]
     })
 
 @app.route('/settings/automation', methods=['POST', 'GET'])

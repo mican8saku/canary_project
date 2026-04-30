@@ -6,11 +6,10 @@ import {
 } from 'recharts';
 import { 
   Activity, Thermometer, Sun, Loader2, 
-  AlertCircle, RefreshCcw 
+  AlertCircle 
 } from "lucide-react";
 import { BASE_URL } from "../api/birdNestApi";
 
-// Komponent för grafernas ramar
 function ChartContainer({ icon: Icon, title, colorClass, children }) {
   return (
     <motion.div 
@@ -40,17 +39,25 @@ export default function DataPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // --- FIX 1: Lägg till saknad state ---
   const [viewMode, setViewMode] = useState('24h');
 
-  // --- FIX 2: Lägg till saknad filter-funktion ---
   const getFilteredData = (rawData) => {
     if (!rawData) return [];
-    if (viewMode === '24h') return rawData;
-    if (viewMode === '6h') return rawData.slice(-36); // Förutsatt 10 min intervall
-    if (viewMode === '1h') return rawData.slice(-6);  
-    return rawData;
+    
+    switch (viewMode) {
+      case '1h':
+        return rawData.slice(-60);    // 60 minuter
+      case '3h':
+        return rawData.slice(-180);   // 3 * 60 minuter
+      case '6h':
+        return rawData.slice(-360);   // 6 * 60 minuter
+      case '12h':
+        return rawData.slice(-720);   // 12 * 60 minuter
+      case '24h':
+        return rawData.slice(-1440);  // 24 * 60 minuter
+      default:
+        return rawData;
+    }
   };
 
   const fetchData = () => {
@@ -72,10 +79,12 @@ export default function DataPage() {
     fetchData();
   }, []);
 
+  // Genererar jämna klockslag för X-axeln om man kör 24h mode
+  const timeTicks = ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:59"];
+
   return (
     <div className="px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-8 space-y-6">
       
-      {/* HEADER */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex justify-between items-end">
         <div>
           <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mb-1">Environmental</p>
@@ -84,7 +93,7 @@ export default function DataPage() {
         
         {/* TIDSKONTROLL */}
         <div className="flex bg-muted p-1 rounded-xl border border-border/50">
-          {['1h', '6h', '24h'].map((mode) => (
+          {['1h', '3h', '6h', '12h', '24h'].map((mode) => (
             <button
               key={mode}
               onClick={() => setViewMode(mode)}
@@ -113,7 +122,36 @@ export default function DataPage() {
       ) : (
         <div className="space-y-8">
           
-          {/* TEMPERATUR */}
+          {/* 1. AKTIVITET (PIR) - NU HÖGST UPP */}
+          <ChartContainer title="Bird Activity" icon={Activity} colorClass="text-green-500">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={getFilteredData(data.pir)}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                <XAxis 
+                  dataKey="time" 
+                  ticks={viewMode === '24h' ? timeTicks : undefined}
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  minTickGap={50}
+                />
+                <YAxis hide domain={[0, 'auto']} />
+                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
+                <Area 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke="#22c55e" 
+                  fill="#22c55e" 
+                  fillOpacity={0.3} 
+                  strokeWidth={3} 
+                  animationDuration={1500}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartContainer>
+
+          {/* 2. TEMPERATUR - FIXED RANGE [15-35] */}
           <ChartContainer title="Air Temperature" icon={Thermometer} colorClass="text-orange-500">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={getFilteredData(data.temperature)}>
@@ -126,13 +164,21 @@ export default function DataPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
+                  ticks={viewMode === '24h' ? timeTicks : undefined}
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false}
-                  minTickGap={30}
+                  minTickGap={50}
                 />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} unit="°" />
+                <YAxis 
+                  domain={[15, 35]} 
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  unit="°" 
+                />
                 <Tooltip 
                   contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
                 />
@@ -143,13 +189,12 @@ export default function DataPage() {
                   strokeWidth={3} 
                   fillOpacity={1} 
                   fill="url(#colorTemp)" 
-                  animationDuration={1000}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </ChartContainer>
 
-          {/* LJUSNIVÅ */}
+          {/* 3. LJUSNIVÅ - FIXED RANGE [0-1000] */}
           <ChartContainer title="Light Intensity" icon={Sun} colorClass="text-yellow-500">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={getFilteredData(data.light)}>
@@ -160,23 +205,24 @@ export default function DataPage() {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
-                <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} minTickGap={30} />
-                <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                <XAxis 
+                  dataKey="time" 
+                  ticks={viewMode === '24h' ? timeTicks : undefined}
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  minTickGap={50}
+                />
+                <YAxis 
+                  domain={[0, 1000]} 
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false} 
+                />
                 <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
                 <Area type="monotone" dataKey="value" stroke="#eab308" fillOpacity={1} fill="url(#colorLight)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-
-          {/* AKTIVITET */}
-          <ChartContainer title="Activity Log" icon={Activity} colorClass="text-green-500">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={getFilteredData(data.pir)}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
-                <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} minTickGap={30} />
-                <YAxis hide />
-                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
-                <Area type="stepAfter" dataKey="value" stroke="#22c55e" fill="#22c55e" fillOpacity={0.1} strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </ChartContainer>
