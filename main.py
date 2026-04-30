@@ -8,7 +8,7 @@ import subprocess
 import threading
 from pathlib import Path
 from datetime import datetime, timezone
-from flask import Flask, jsonify, send_file, request, Response
+from flask import Flask, jsonify, send_file, request, Response, send_from_directory
 from flask_cors import CORS
 
 BASE_DIR = Path(__file__).parent.absolute()
@@ -584,6 +584,17 @@ def camera_stream():
     """Video stream route"""
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
+    
+# --- Default route om filen inte hittas (Catch All)
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def catch_all(path):
+    # Kolla om filen faktiskt finns i din build-mapp (t.ex. bilder eller css)
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        # Annars skicka index.html så att React Router kan ta över
+        return send_from_directory(app.static_folder, 'index.html')
 
 
 

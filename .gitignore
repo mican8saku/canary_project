@@ -7,5 +7,6 @@ static/gallery/*
 static/gallery/
 test_bild.jpg
 state.json
+sensor_history.json
 
 canary_project.code-workspace
