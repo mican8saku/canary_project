@@ -142,7 +142,7 @@ export default function Home() {
         }`}>
           {lightOn ? "On" : "Off"}
         </span>
-        <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mb-3 shadow-sm">
+        <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-3 shadow-sm">
           <Sun className="h-5 w-5 text-white" />
         </div>
         <p className="text-sm font-bold text-foreground">Lights</p>
@@ -161,7 +161,7 @@ export default function Home() {
               }`}>
                 {deviceOnline ? "Live" : "Offline"}
               </span>
-              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center mb-3 shadow-sm">
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-3 shadow-sm">
                 <Camera className="h-5 w-5 text-white" />
               </div>
               <p className="text-sm font-bold text-foreground">Camera</p>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Lightbulb, LightbulbOff, Loader2, Power } from "lucide-react";
+import { Lightbulb, LightbulbOff, Loader2, Sun } from "lucide-react";
 
 export default function LightControlCard({ lightOn, onToggle }) {
   const [loading, setLoading] = useState(false);
@@ -52,7 +52,7 @@ export default function LightControlCard({ lightOn, onToggle }) {
       <div className="p-5 relative z-10">
         <div className="flex items-center gap-2 mb-4">
           <div className="h-7 w-7 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-            <Power className={`h-3.5 w-3.5 ${lightOn ? "text-yellow-400" : "text-slate-400"}`} />
+            <Sun className={`h-3.5 w-3.5 ${lightOn ? "text-yellow-400" : "text-slate-400"}`} />
           </div>
           <div>
             <h2 className="text-white font-bold text-base leading-tight">Belysning</h2>
