@@ -86,3 +86,23 @@
     @apply bg-background text-foreground font-inter;
   }
 }
+
+.ios-alert-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px); /* Detta suddar ut hela webbappen bakom */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999; /* Garanterar att den ligger överst av allt */
+}
+
+.ios-alert-box {
+  background: rgba(255, 255, 255, 0.9);
+  width: 270px;
+  border-radius: 14px;
+  text-align: center;
+  font-family: -apple-system, system-ui, sans-serif;
+  overflow: hidden;
+}
