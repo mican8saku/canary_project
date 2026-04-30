@@ -1,64 +1,27 @@
 import React from 'react';
-import { Line } from 'react-chartjs-2';
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
   Tooltip,
-  Legend,
-  Filler
-} from 'chart.js';
-
-// Registrera modulerna i Chart.js
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
-);
+  ResponsiveContainer,
+  Area,
+  AreaChart
+} from 'recharts';
 
 export default function DataPage() {
-  // Mock-data för PIR-aktivitet över ett dygn
-  const data = {
-    labels: ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00", "23:59"],
-    datasets: [
-      {
-        label: 'Rörelse i buren (PIR)',
-        data: [0, 0, 12, 45, 30, 10, 2], // Exempelvärden (antal triggers)
-        fill: true,
-        borderColor: '#10b981', // En snygg grön färg (Emerald-500)
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        tension: 0.4, // Gör linjen mjukt kurvad
-        pointRadius: 4,
-      },
-    ],
-  };
-
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        display: false, // Dölj legend för en renare look
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        grid: { color: 'rgba(255, 255, 255, 0.05)' },
-      },
-      x: {
-        grid: { display: false },
-      }
-    },
-  };
+  // Recharts vill ha data som en array av objekt
+  const data = [
+    { time: "00:00", activity: 0 },
+    { time: "04:00", activity: 0 },
+    { time: "08:00", activity: 12 },
+    { time: "12:00", activity: 45 },
+    { time: "16:00", activity: 30 },
+    { time: "20:00", activity: 10 },
+    { time: "23:59", activity: 2 },
+  ];
 
   return (
     <div className="p-4 sm:p-8 max-w-4xl mx-auto">
@@ -78,11 +41,56 @@ export default function DataPage() {
           </div>
           
           <div className="h-[300px] w-full">
-            <Line data={data} options={options} />
+            <ResponsiveContainer width="100%" height="100%">
+              {/* Vi använder AreaChart för att få den snygga fyllningen (fill) under linjen */}
+              <AreaChart data={data}>
+                <defs>
+                  <linearGradient id="colorActivity" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid 
+                  vertical={false} 
+                  strokeDasharray="3 3" 
+                  stroke="rgba(255, 255, 255, 0.05)" 
+                />
+                <XAxis 
+                  dataKey="time" 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#888', fontSize: 12 }}
+                  dy={10}
+                />
+                <YAxis 
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#888', fontSize: 12 }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#1a1a1a', 
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '12px' 
+                  }}
+                  itemStyle={{ color: '#10b981' }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="activity" 
+                  stroke="#10b981" 
+                  strokeWidth={3}
+                  fillOpacity={1} 
+                  fill="url(#colorActivity)" 
+                  dot={{ r: 4, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 6, strokeWidth: 0 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Ett extra kort för snabbinfo */}
+        {/* Info-kort */}
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-card rounded-2xl border border-border/50 p-4">
             <p className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Mest aktiv</p>
