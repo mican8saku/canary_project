@@ -53,7 +53,7 @@ auto_light_active = False
 manual_override_until = 0  # Timestamp för när automationen får starta igen
 
 latest_sensor_data = {
-    "temp": 22.0,
+    "temp": 22.2,
     "lux": 0.0,
     "last_updated": None
 }

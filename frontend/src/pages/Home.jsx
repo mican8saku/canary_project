@@ -28,7 +28,7 @@ export default function Home() {
         <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="relative z-10">
           <p className="text-xs font-medium text-white/70 uppercase tracking-widest mb-1">{greeting}</p>
           <h1 className="text-3xl font-bold text-white tracking-tight mb-1">SmartNest</h1>
-          <p className="text-sm text-white/60">Bird monitoring & nest care</p>
+          <p className="text-sm text-white/60">Bird monitoring & Light Control</p>
         </motion.div>
 
         {/* Sensor Strip */}
