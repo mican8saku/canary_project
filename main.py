@@ -538,8 +538,12 @@ def camera_snapshot():
             'rpicam-still', 
             '-o', str(filepath), 
             '-t', '1000', 
+            '--width', '1536',  # Snapshots kan vara högupplösta
+            '--height', '2048', # Matchar 3:4 formatet stående
+            '--vflip', '1',
+            '--hflip', '1',
             '--nopreview',
-            '--immediate' # Tar bilden så fort som möjligt
+            '--immediate'
         ], check=True)
 
         # 3. Starta om stream-processen i bakgrunden (valfritt om din stream-loop gör det själv)
@@ -594,8 +598,10 @@ def generate_frames():
         'rpicam-vid',
         '-t', '0',
         '--inline',
-        '--width', '640',
-        '--height', '480',
+        '--width', '768',
+        '--height', '1024',
+        '--vflip', '1',
+        '--hflip', '1',
         '--framerate', '15',
         '--codec', 'mjpeg',
         '-n', 
