@@ -143,7 +143,7 @@ try:
     GPIO.setup(BUTTON_DOWN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(LEDSTRIP_BUTTON, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-    dht_device = adafruit_dht.DHT11(board.D25)
+    dht_device = adafruit_dht.DHT11(board.D26)
     i2c = board.I2C()
     tsl_sensor = adafruit_tsl2591.TSL2591(i2c)
     motor.setup_motors()

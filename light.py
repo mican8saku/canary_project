@@ -9,7 +9,7 @@ NUM_PIXELS = 8
 # Initiera strippen
 pixels = neopixel.NeoPixel(PIXEL_PIN, NUM_PIXELS, brightness=0.0, auto_write=True)
 
-def set_light(state, color=(255, 255, 255), duration=1.5):
+def set_light(state, color=(255, 180, 50), duration=1.5):
     """
     state: True (tänd) eller False (släck)
     color: (R, G, B)
