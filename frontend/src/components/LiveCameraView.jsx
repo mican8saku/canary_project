@@ -22,14 +22,14 @@ export default function LiveCameraView({ isCapturing }) { // Ta emot isCapturing
   }, [isCapturing, error, reloadStream]);
 
   return (
-    <div className="relative aspect-video rounded-2xl overflow-hidden bg-slate-900 border border-white/5 shadow-xl">
+    <div className="relative aspect-[3/4] max-h-[520px] mx-auto rounded-[2.5rem] overflow-hidden bg-slate-900 border border-white/5 shadow-2xl">
       {error ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-white/40 p-4">
-          <CameraOff className="w-12 h-12 mb-2 opacity-20" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-white/40 p-6 text-center">
+          <CameraOff className="w-12 h-12 mb-3 opacity-20" />
           <p className="text-sm font-medium">Stream Offline</p>
           <button 
             onClick={reloadStream}
-            className="mt-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all"
+            className="mt-4 px-6 py-2 bg-primary text-primary-foreground rounded-xl text-xs font-bold transition-all active:scale-95"
           >
             Reconnect
           </button>
@@ -40,12 +40,12 @@ export default function LiveCameraView({ isCapturing }) { // Ta emot isCapturing
             key={key}
             src={`${BASE_URL}/camera/stream?t=${key}`} 
             alt="Live Bird Stream"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover" 
             onError={() => setError(true)}
           />
           
           {/* Status Overlay */}
-          <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+          <div className="absolute top-5 left-5 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
             {isCapturing ? (
               <>
                 <span className="w-2 h-2 bg-amber-500 rounded-full animate-ping" />
@@ -59,12 +59,12 @@ export default function LiveCameraView({ isCapturing }) { // Ta emot isCapturing
             )}
           </div>
 
-          <div className="absolute bottom-4 right-4 flex gap-2">
+          <div className="absolute bottom-5 right-5">
             <button 
               onClick={reloadStream}
-              className="p-2.5 bg-black/40 backdrop-blur-md hover:bg-black/60 rounded-xl border border-white/10 transition-all"
+              className="p-3 bg-black/60 backdrop-blur-md hover:bg-white/20 rounded-2xl border border-white/10 transition-all group"
             >
-              <RefreshCw className="w-4 h-4 text-white" />
+              <RefreshCw className="w-4 h-4 text-white group-active:rotate-180 transition-transform duration-500" />
             </button>
           </div>
         </>

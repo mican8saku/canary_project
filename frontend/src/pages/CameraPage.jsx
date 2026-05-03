@@ -137,7 +137,7 @@ export default function CameraPage() {
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  className="group relative aspect-square rounded-[2rem] overflow-hidden border border-border/50 bg-card shadow-sm"
+                  className="group relative aspect-[3/4] rounded-[2rem] overflow-hidden border border-border/50 bg-card shadow-sm"
                 >
                   <img 
                     src={`${BASE_URL}/static/gallery/${filename}?t=${filename}`} 
