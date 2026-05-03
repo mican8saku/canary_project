@@ -35,6 +35,13 @@ last_motion_at = datetime.now(timezone.utc).isoformat()
 MOTION_IDLE_THRESHOLD = 30 # Sekunder innan fågeln räknas som inaktiv
 camera_process = None
 
+# Variabler för att hålla koll på tillstånd
+last_motion_time = time.time()
+auto_light_active = False
+manual_override_until = 0  # Timestamp för när automationen får starta igen
+current_frame = None
+frame_lock = threading.Lock()
+
 # --- AUTOMATIONS-INSTÄLLNINGAR (Default-värden) ---
 auto_settings = {
     "led_routine_active": True,       # Övergripande LED-automation
@@ -47,10 +54,7 @@ auto_settings = {
     "time_down": "21:30"    
 }
 
-# Variabler för att hålla koll på tillstånd
-last_motion_time = time.time()
-auto_light_active = False
-manual_override_until = 0  # Timestamp för när automationen får starta igen
+
 
 latest_sensor_data = {
     "temp": 22.2,
@@ -399,6 +403,43 @@ def history_collector_thread():
             print(f"Critical error in history thread: {e}")
 
         time.sleep(0.5)
+        
+def camera_producer_thread():
+    """Läser från kameran i en loop och sparar senaste bilden globalt."""
+    global current_frame
+    
+    if not IS_PI:
+        return
+
+    cmd = [
+        'rpicam-vid', '-t', '0', '--inline', '--width', '480', '--height', '640',
+        '--vflip', '1', '--hflip', '1', '--framerate', '15', '--codec', 'mjpeg',
+        '-n', '-o', '-'
+    ]
+    
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=0)
+    buffer = b""
+    
+    print("Camera Producer Thread: Started")
+    
+    try:
+        while True:
+            chunk = process.stdout.read(4096)
+            if not chunk: break
+            buffer += chunk
+            
+            start = buffer.find(b'\xff\xd8')
+            end = buffer.find(b'\xff\xd9')
+            
+            if start != -1 and end != -1 and end > start:
+                jpg = buffer[start:end+2]
+                buffer = buffer[end+2:]
+                
+                # Spara bilden säkert så andra trådar kan läsa den
+                with frame_lock:
+                    current_frame = jpg
+    finally:
+        process.terminate()
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
@@ -572,52 +613,31 @@ def control_led():
     return jsonify({"ok": True, "led_on": turn_on})
 
 def generate_frames():
-    """Generator som strömmar video med tydligare bild-gränser"""
-    if not IS_PI:
-        while True:
+    """Hämtar bilder från den globala variabeln och skickar till klienten."""
+    global current_frame
+    
+    while True:
+        # Om vi inte är på en Pi, skicka fake data
+        if not IS_PI:
             time.sleep(0.5)
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + b'FAKE_DATA' + b'\r\n')
-        return
+            continue
 
-    # Vi använder -n för att slippa preview-fönstret på Pi:n
-    cmd = [
-        'rpicam-vid',
-        '-t', '0',
-        '--inline',
-        '--width', '480',
-        '--height', '640',
-        '--vflip', '1',
-        '--hflip', '1',
-        '--framerate', '15',
-        '--codec', 'mjpeg',
-        '-n', 
-        '-o', '-'
-    ]
-    
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=0)
-    
-    try:
-        # MJPEG skickar bilder som börjar med 0xff 0xd8 och slutar med 0xff 0xd9
-        # Vi läser dataströmmen och letar efter dessa markörer
-        buffer = b""
-        while True:
-            chunk = process.stdout.read(4096)
-            if not chunk:
-                break
-            buffer += chunk
-            
-            # Leta efter start och slut på en JPEG-bild
-            start = buffer.find(b'\xff\xd8')
-            end = buffer.find(b'\xff\xd9')
-            
-            if start != -1 and end != -1 and end > start:
-                jpg = buffer[start:end+2]
-                buffer = buffer[end+2:]
-                yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
-    finally:
-        process.terminate()
+        # Vänta på en bild om ingen finns än
+        if current_frame is None:
+            time.sleep(0.1)
+            continue
+
+        # Hämta den senaste bilden
+        with frame_lock:
+            local_frame = current_frame
+
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + local_frame + b'\r\n')
+        
+        # En liten paus för att inte stressa CPU:n (15 FPS = 0.06s)
+        time.sleep(0.06)
 
 @app.route('/camera/stream')
 def camera_stream():
@@ -654,6 +674,10 @@ if __name__ == '__main__':
         # Tråd för data insamling och visualisering i grafer 
         t3 = threading.Thread(target=history_collector_thread, daemon=True)
         t3.start()
+        
+        # Tråd för att strömma live video frames
+        t4 = threading.Thread(target=camera_producer_thread, daemon=True)
+        t4.start()
 
         # Körs på port 5000 för att matcha hans frontend-anrop
         app.run(host='0.0.0.0', port=5000, debug=False)
