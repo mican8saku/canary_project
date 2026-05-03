@@ -9,12 +9,14 @@ const hour = new Date().getHours();
 const greeting = hour < 12 ? "Good Morning" : hour < 18 ? "Good Afternoon" : "Good Evening";
 
 export default function Home() {
-  const { temperature, birdStatus, curtainState, lastMotionAt, lastMotionAtRaw, alerts, dismissAlert, loading, deviceOnline } = useBirdNest();
+  const { lux, temperature, birdStatus, curtainState, lastMotionAt, lastMotionAtRaw, lightOn, alerts, dismissAlert, loading, deviceOnline } = useBirdNest();
 
   const birdActive = birdStatus === "active";
 
   const tempDisplay = temperature != null ? `${temperature}°C` : "--°C";
   const birdStatusDisplay = birdStatus ?? "Unknown";
+
+  const luxDisplay = lux != null ? `${lux} lx` : "-- lx";
 
   return (
     <div className="min-h-screen">
@@ -26,26 +28,38 @@ export default function Home() {
         <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="relative z-10">
           <p className="text-xs font-medium text-white/70 uppercase tracking-widest mb-1">{greeting}</p>
           <h1 className="text-3xl font-bold text-white tracking-tight mb-1">SmartNest</h1>
-          <p className="text-sm text-white/60">Bird monitoring & nest care</p>
+          <p className="text-sm text-white/60">Bird monitoring & Light Control</p>
         </motion.div>
 
         {/* Sensor Strip */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.08 }}
-          className="relative z-10 mt-6 flex items-center gap-3"
-        >
-          <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2.5">
-            <Thermometer className={`h-4 w-4 ${temperature >= 30 ? "text-orange-300" : "text-white/70"}`} />
-            <div>
-              <span className={`text-sm font-bold ${temperature != null && temperature >= 30 ? "text-orange-200" : "text-white"}`}>
-                {tempDisplay}
-              </span>
-              <span className="text-[11px] text-white/50 ml-1.5">Temperature</span>
-            </div>
-          </div>
-        </motion.div>
+<motion.div
+  initial={{ opacity: 0, y: 12 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ delay: 0.08 }}
+  className="relative z-10 mt-6 flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar"
+>
+  {/* Temperature Tag */}
+  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2.5 whitespace-nowrap">
+    <Thermometer className={`h-4 w-4 ${temperature >= 30 ? "text-orange-300" : "text-white/70"}`} />
+    <div>
+      <span className={`text-sm font-bold ${temperature != null && temperature >= 30 ? "text-orange-200" : "text-white"}`}>
+        {tempDisplay}
+      </span>
+      <span className="text-[11px] text-white/50 ml-1.5">Temp</span>
+    </div>
+  </div>
+
+  {/* Lux Tag - NY! */}
+  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-2.5 whitespace-nowrap">
+    <Sun className={`h-4 w-4 ${lux < 50 ? "text-blue-300" : "text-amber-300"}`} />
+    <div>
+      <span className="text-sm font-bold text-white">
+        {luxDisplay}
+      </span>
+      <span className="text-[11px] text-white/50 ml-1.5">Light</span>
+    </div>
+  </div>
+</motion.div>
       </div>
 
       {/* Offline / error banner */}
@@ -122,21 +136,19 @@ export default function Home() {
 
          {/* LIGHTS - Ny knapp som går till dashboard */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.19 }}>
-            <Link
-              to="/dashboard"
-              className="relative block bg-card border border-border/60 rounded-2xl p-5 active:scale-95 transition-transform shadow-sm"
-            >
-              {/* Här kan du styra statusen baserat på din LED-variabel om du har en, annars kör vi en default */}
-              <span className="absolute top-3 right-3 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
-                Smart
-              </span>
-              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-3 shadow-sm">
-                <Sun className="h-5 w-5 text-white" />
-              </div>
-              <p className="text-sm font-bold text-foreground">Lights</p>
-              <p className="text-xs text-muted-foreground mt-0.5">LED & Lux settings</p>
-            </Link>
-          </motion.div>
+      <Link to="/dashboard" className="relative block bg-card border border-border/60 rounded-2xl p-5 active:scale-95 transition-transform shadow-sm">
+        <span className={`absolute top-3 right-3 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+          lightOn ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-500"
+        }`}>
+          {lightOn ? "On" : "Off"}
+        </span>
+        <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-3 shadow-sm">
+          <Sun className="h-5 w-5 text-white" />
+        </div>
+        <p className="text-sm font-bold text-foreground">Lights</p>
+        <p className="text-xs text-muted-foreground mt-0.5">LED & Lux settings</p>
+      </Link>
+    </motion.div>
 
           {/* CAMERA */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
@@ -149,7 +161,7 @@ export default function Home() {
               }`}>
                 {deviceOnline ? "Live" : "Offline"}
               </span>
-              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center mb-3 shadow-sm">
+              <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center mb-3 shadow-sm">
                 <Camera className="h-5 w-5 text-white" />
               </div>
               <p className="text-sm font-bold text-foreground">Camera</p>

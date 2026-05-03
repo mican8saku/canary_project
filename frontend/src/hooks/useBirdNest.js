@@ -3,13 +3,15 @@ import {
   getSystemStatus,
   openCurtain as apiOpen,
   closeCurtain as apiClose,
-  apiPost
+  apiPost,
+  BASE_URL
 } from "../api/birdNestApi";
 
 const POLL_INTERVAL_MS = 2_000;
 
+// DENNA FUNKTION SAKNADES:
 function formatLastMotion(isoString) {
-  if (!isoString) return "Unknown";
+  if (!isoString) return "No motion detected";
   const seconds = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
   if (seconds < 60) return `${seconds}s ago`;
   const minutes = Math.floor(seconds / 60);
@@ -21,9 +23,9 @@ function formatLastMotion(isoString) {
 
 export function useBirdNest() {
   const [temperature, setTemperature] = useState(null);
-  const [curtainState, setCurtainState] = useState(null);  // "open" | "closed"
-  const [birdStatus, setBirdStatus] = useState(null);       // "active" | "inactive"
-  const [lastMotionAt, setLastMotionAt] = useState(null);   // ISO string
+  const [curtainState, setCurtainState] = useState(null);
+  const [birdStatus, setBirdStatus] = useState(null);
+  const [lastMotionAt, setLastMotionAt] = useState(null);
   const [deviceOnline, setDeviceOnline] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -31,17 +33,15 @@ export function useBirdNest() {
   const [curtainLoading, setCurtainLoading] = useState(false);
   const [lightOn, setLightOn] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [lux, setLux] = useState(null);
+  
 
-  const dismissAlert = useCallback((id) => {
-    setAlerts((prev) => prev.filter((a) => a.id !== id));
-  }, []);
-
-  // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchStatus = useCallback(async () => {
     try {
       const status = await getSystemStatus();
-
       setTemperature(status.temperature);
+      setLux(status.light);
       setCurtainState(status.curtainState);
       setLightOn(status.lightOn); 
       setIsMoving(status.isMoving); 
@@ -56,7 +56,6 @@ export function useBirdNest() {
     }
   }, []);
 
-  // ── Polling ────────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     async function initialFetch() {
@@ -72,15 +71,25 @@ export function useBirdNest() {
     };
   }, [fetchStatus]);
 
-  // ── Curtain actions ────────────────────────────────────────────────────────
+  const takeSnapshot = useCallback(async () => {
+    if (isCapturing) return;
+    setIsCapturing(true);
+    try {
+      const response = await fetch(`${BASE_URL}/camera/snapshot`);
+      return await response.json();
+    } catch (err) {
+      console.error("Camera error:", err);
+    } finally {
+      setIsCapturing(false);
+    }
+  }, [isCapturing]);
+
   const openCurtain = useCallback(async () => {
     if (curtainLoading) return;
     setCurtainLoading(true);
     try {
       const res = await apiOpen();
-      if (res && typeof res.curtainState === 'number') {
-        setCurtainState(res.curtainState) 
-      };
+      if (res && res.curtainState !== undefined) setCurtainState(res.curtainState);
     } finally {
       setCurtainLoading(false);
     }
@@ -91,42 +100,39 @@ export function useBirdNest() {
     setCurtainLoading(true);
     try {
       const res = await apiClose();
-      if (res && typeof res.curtainState === 'number') {
-        setCurtainState(res.curtainState)
-      };
+      if (res && res.curtainState !== undefined) setCurtainState(res.curtainState);
     } finally {
       setCurtainLoading(false);
     }
   }, [curtainLoading]);
 
-  // ---- Light Control ------ 
   const toggleLight = useCallback(async () => {
-  try {
-    const res = await apiPost('/light/toggle'); 
-    if (res && res.lightOn !== undefined) {
-      setLightOn(res.lightOn);
+    try {
+      const res = await apiPost('/light/toggle'); 
+      if (res && res.lightOn !== undefined) setLightOn(res.lightOn);
+    } catch (err) {
+      console.error("Light error:", err);
     }
-  } catch (err) {
-    console.error("Kunde inte ändra ljus:", err);
-  }
-}, []); // Tom array är ok här om du inte använder lightOn-variabeln inuti try-blocket
+  }, []);
 
   return {
     temperature,
+    lux,
     curtainState,
     lightOn,
     isMoving,
     toggleLight,
     birdStatus,
-    lastMotionAt: formatLastMotion(lastMotionAt),
+    lastMotionAt: formatLastMotion(lastMotionAt), // Anropar funktionen ovan
     lastMotionAtRaw: lastMotionAt,
     deviceOnline,
     loading,
     error,
     alerts,
-    dismissAlert,
     openCurtain,
     closeCurtain,
     curtainLoading,
+    takeSnapshot,
+    isCapturing
   };
 }

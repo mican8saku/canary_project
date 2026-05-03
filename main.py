@@ -8,20 +8,23 @@ import subprocess
 import threading
 from pathlib import Path
 from datetime import datetime, timezone
-from flask import Flask, jsonify, send_file, request, Response
+from flask import Flask, jsonify, send_file, request, Response, send_from_directory
 from flask_cors import CORS
-from pathlib import Path
 
 BASE_DIR = Path(__file__).parent.absolute()
 STATE_FILE = BASE_DIR / "state.json"
+HISTORY_FILE = BASE_DIR / "sensor_history.json"
 
 app = Flask(__name__)
 # Krävs för att Webbapp ska kunna prata med Pien
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {
+    "origins": "*",
+    "methods": ["GET", "POST", "OPTIONS"],
+    "allow_headers": ["Content-Type", "Authorization"]
+}})
 
 # --- KONFIGURATION & FILER ---
 UPLOAD_FOLDER = Path("static/gallery")
-STATE_FILE = Path("state.json")
 UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 
 # --- APP STATE (Minne vid omstart) ---
@@ -30,6 +33,7 @@ is_moving = False
 light_state = False
 last_motion_at = datetime.now(timezone.utc).isoformat()
 MOTION_IDLE_THRESHOLD = 30 # Sekunder innan fågeln räknas som inaktiv
+camera_process = None
 
 # --- AUTOMATIONS-INSTÄLLNINGAR (Default-värden) ---
 auto_settings = {
@@ -47,6 +51,20 @@ auto_settings = {
 last_motion_time = time.time()
 auto_light_active = False
 manual_override_until = 0  # Timestamp för när automationen får starta igen
+
+latest_sensor_data = {
+    "temp": 22.2,
+    "lux": 0.0,
+    "last_updated": None
+}
+
+# --- GLOBAL HISTORIK FÖR GRAFER ---
+sensor_history = {
+    "temperature": [],
+    "light": [],
+    "pir": []
+}
+MAX_POINTS = 1440  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
 
 def save_state():
     try:
@@ -76,6 +94,30 @@ def load_state():
 
 load_state()
 
+def save_history():
+    try:
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(sensor_history, f)
+    except Exception as e:
+        print(f"Error saving history: {e}")
+
+def load_history():
+    global sensor_history
+    if HISTORY_FILE.exists():
+        try:
+            with open(HISTORY_FILE, 'r') as f:
+                data = json.load(f)
+                # Säkerställ att alla nycklar finns
+                for key in ["temperature", "light", "pir"]:
+                    if key in data:
+                        sensor_history[key] = data[key]
+            print("History loaded from disk.")
+        except Exception as e:
+            print(f"Error loading history: {e}")
+
+# Kalla på denna i början av programmet (t.ex. efter load_state())
+load_history()
+
 # --- HÅRDVARA SETUP ---
 try:
     import RPi.GPIO as GPIO
@@ -90,19 +132,18 @@ try:
     GPIO.setwarnings(False)
     
     PIR_PIN = 14
-    LED_PIN = 18
+    LED_PIN = 13
     BUTTON_UP = 16
     BUTTON_DOWN = 20
     LEDSTRIP_BUTTON = 21
     
     GPIO.setup(PIR_PIN, GPIO.IN)
     GPIO.setup(LED_PIN, GPIO.OUT)
-    GPIO.setup(LEDSTRIP_BUTTON, GPIO.OUT)
     GPIO.setup(BUTTON_UP, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(BUTTON_DOWN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     GPIO.setup(LEDSTRIP_BUTTON, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
-    dht_device = adafruit_dht.DHT11(board.D25)
+    dht_device = adafruit_dht.DHT11(board.D26)
     i2c = board.I2C()
     tsl_sensor = adafruit_tsl2591.TSL2591(i2c)
     motor.setup_motors()
@@ -211,10 +252,10 @@ def automation_routine_thread():
                 last_motion_time = time.time() 
                 # 2. För API/Frontend (klockslag)
                 last_motion_at = datetime.now().isoformat()
-                # 3. Tänd debug-lampan (PIN 18)
-                if IS_PI: GPIO.output(18, GPIO.HIGH)
+                # 3. Tänd debug-lampan
+                if IS_PI: GPIO.output(LED_PIN, GPIO.HIGH)
             else:
-                if IS_PI: GPIO.output(18, GPIO.LOW)
+                if IS_PI: GPIO.output(LED_PIN, GPIO.LOW)
             nu = datetime.now()
             current_time_ts = time.time()
             
@@ -301,49 +342,133 @@ def start_curtain_thread(target, reason):
         print(f"Trigger: {reason} -> Moving to {target}%")
         threading.Thread(target=move_curtain_gradually, args=(target,), daemon=True).start()
 
+def history_collector_thread():
+    global sensor_history, latest_sensor_data, last_motion_at
+    print("Starting History Collector & Sensor Monitor...")
+    
+    motion_accumulator = 0
+    loop_count = 0
+
+    while True:
+        try:
+            # --- 1. LÄS SENSORER (Var 10:e sekund) ---
+            current_temp = latest_sensor_data["temp"] # Behåll gammalt värde som fallback
+            current_lux = 350.0
+            motion_now = False
+
+            if IS_PI:
+                # Läs Ljus
+                try:
+                    current_lux = round(tsl_sensor.lux, 1)
+                except: pass
+
+                # Läs Rörelse
+                motion_now = (GPIO.input(PIR_PIN) == 1)
+                if motion_now:
+                    last_motion_at = datetime.now().isoformat()
+                    motion_accumulator += 1 # För compounding-grafen
+
+                # Läs Temperatur (DHT11 är petig, läs var 10:e sek är lagom)
+                try:
+                    t = dht_device.temperature
+                    if t is not None:
+                        current_temp = t
+                except:
+                    pass # Behåll senaste lyckade läsningen
+            else:
+                # Mock-data för testmiljö
+                current_lux = 350.0
+                motion_now = False
+
+            # Uppdatera globala variabler för blixtsnabb /status
+            latest_sensor_data["temp"] = current_temp
+            latest_sensor_data["lux"] = current_lux
+            latest_sensor_data["motion_now"] = motion_now
+            latest_sensor_data["last_updated"] = datetime.now().strftime("%H:%M:%S")
+
+            # --- 2. LOGGA TILL HISTORIK (Varje minut: loop_count 6 * 10s) ---
+            loop_count += 1
+            if loop_count >= 6:
+                timestamp = datetime.now().strftime("%H:%M")
+
+                # Spara till minnet
+                sensor_history["temperature"].append({"time": timestamp, "value": current_temp})
+                sensor_history["light"].append({"time": timestamp, "value": current_lux})
+                sensor_history["pir"].append({"time": timestamp, "value": motion_accumulator})
+
+                # Håll 24h historik (1440 punkter)
+                for key in sensor_history:
+                    if len(sensor_history[key]) > 1440:
+                        sensor_history[key].pop(0)
+
+                # Spara till fil (sensor_history.json)
+                save_history()
+
+                # Nollställ för nästa minut
+                motion_accumulator = 0
+                loop_count = 0
+
+        except Exception as e:
+            print(f"Critical error in history thread: {e}")
+
+        time.sleep(10)
+
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
     return "open" if curtain_state == 100 else "closed"
 
 def get_bird_status(motion_now):
     global last_motion_at
+    # Skapa nuvarande tid med UTC-aware objekt
+    now = datetime.now(timezone.utc)
+    
     if motion_now:
-        last_motion_at = datetime.now(timezone.utc).isoformat()
+        last_motion_at = now.isoformat()
         save_state()
         return "active"
     
+    # Gör om den sparade strängen till ett objekt
     last_motion = datetime.fromisoformat(last_motion_at)
-    idle_time = (datetime.now(timezone.utc) - last_motion).total_seconds()
+    
+    # VIKTIGT: Om det sparade objektet saknar tidszon, lägg till UTC
+    if last_motion.tzinfo is None:
+        last_motion = last_motion.replace(tzinfo=timezone.utc)
+    
+    # Nu kan vi subtrahera dem utan krasch
+    idle_time = (now - last_motion).total_seconds()
+    
     return "active" if idle_time < MOTION_IDLE_THRESHOLD else "inactive"
 
 # --- INTEGRATION ROUTES (För Webbapp gränssnitt) ---
 
+@app.route('/api/sensors', methods=['GET'])
+def get_sensor_history():
+    """Returnerar insamlad historik till DataPage"""
+    return jsonify(sensor_history)
+
 @app.route('/status', methods=['GET'])
 def status():
-    """Huvudstatus som servar både Dashboard och Diagnostics"""
-    lux = tsl_sensor.lux if IS_PI else 350.0
-    motion_now = GPIO.input(PIR_PIN) == 1 if IS_PI else False
-    
     global last_motion_at
-    if motion_now:
-        from datetime import datetime
-        last_motion_at = datetime.now().isoformat()
-
+    
+    # Beräkna override-tid för säkerhets skull
+    time_left_override = max(0, int(manual_override_until - time.time()))
+    
     return jsonify({
         "ok": True,
         "isPi": IS_PI,
         "deviceOnline": True,
         "stateFileExists": STATE_FILE.exists(),
-        "temperature": 22.0,
+        "temperature": latest_sensor_data["temp"],  # Från tråden
         "curtainState": curtain_state, 
-        "birdStatus": get_bird_status(motion_now),
+        "birdStatus": get_bird_status(latest_sensor_data["motion_now"]),
         "lastMotionAt": last_motion_at,
-        "light": round(lux, 2),
+        "light": latest_sensor_data["lux"],        # Från tråden
         "tempSensor": "ok" if IS_PI else "mock",
         "motorControl": "OK" if IS_PI else "mock",
-        # --- NYA FÄLT HÄR ---
         "lightOn": light_state,
-        "isMoving": is_moving
+        "isMoving": is_moving,
+        "manual_override": time_left_override > 0,
+        "lastUpdate": latest_sensor_data["last_updated"]
     })
 
 @app.route('/settings/automation', methods=['POST', 'GET'])
@@ -361,6 +486,7 @@ def update_automation_settings():
 
 @app.route('/curtain/open', methods=['POST'])
 def curtain_open():
+    global manual_override_until
     if is_moving:
         return jsonify({"ok": False, "error": "Already moving"}), 400
     
@@ -371,6 +497,7 @@ def curtain_open():
 
 @app.route('/curtain/close', methods=['POST'])
 def curtain_close():
+    global manual_override_until
     if is_moving:
         return jsonify({"ok": False, "error": "Already moving"}), 400
 
@@ -395,20 +522,56 @@ def light_toggle():
 
 @app.route('/camera/snapshot', methods=['GET'])
 def camera_snapshot():
-    """Tar en bild och skickar direkt till appen"""
-    filename = "snapshot.jpg"
+    global camera_process
+    filename = f"capture_{int(time.time())}.jpg"
     filepath = UPLOAD_FOLDER / filename
     
-    if IS_PI:
-        try:
-            # Använder rpicam-still (standard för Camera Module 3)
-            subprocess.run(['rpicam-still', '-o', str(filepath), '-t', '500', '--nopreview'], check=True)
-            return send_file(filepath, mimetype='image/jpeg')
-        except Exception as e:
-            return jsonify({"ok": False, "error": str(e)}), 500
-    
-    # Om vi är på PC, skicka en placeholder
-    return jsonify({"ok": True, "mock_url": "https://placehold.co/600x400?text=Kamera+Mock"})
+    try:
+        # 1. Stoppa stream-processen om den körs
+        # Detta frigör kamerahårdvaran (imx708)
+        subprocess.run(['pkill', 'rpicam-vid'], check=False)
+        time.sleep(0.5) # Ge hårdvaran ett ögonblick att släppa taget
+
+        # 2. Ta bilden
+        print(f"Tar snapshot: {filename}")
+        subprocess.run([
+            'rpicam-still', 
+            '-o', str(filepath), 
+            '-t', '1000', 
+            '--width', '1536',  # Snapshots kan vara högupplösta
+            '--height', '2048', # Matchar 3:4 formatet stående
+            '--vflip', '1',
+            '--hflip', '1',
+            '--nopreview',
+            '--immediate'
+        ], check=True)
+
+        # 3. Starta om stream-processen i bakgrunden (valfritt om din stream-loop gör det själv)
+        # Om din stream sköts via en route, kommer den starta om vid nästa request.
+        
+        return jsonify({
+            "ok": True, 
+            "filename": filename,
+            "url": f"/static/gallery/{filename}"
+        })
+
+    except subprocess.CalledProcessError as e:
+        print(f"Kamera-fel: {e}")
+        return jsonify({"ok": False, "error": "Kameran upptagen"}), 500
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route('/api/gallery', methods=['GET'])
+def get_gallery():
+    """Returnerar en lista på alla sparade bilder i galleriet"""
+    try:
+        # Lista alla .jpg och .png filer i mappen
+        images = [f for f in os.listdir(UPLOAD_FOLDER) if f.endswith(('.jpg', '.jpeg', '.png'))]
+        # Sortera så nyaste bilderna kommer först (baserat på filnamn eller datum)
+        images.sort(reverse=True)
+        return jsonify({"ok": True, "images": images})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route('/led', methods=['POST'])
 def control_led():
@@ -435,8 +598,10 @@ def generate_frames():
         'rpicam-vid',
         '-t', '0',
         '--inline',
-        '--width', '640',
-        '--height', '480',
+        '--width', '480',
+        '--height', '640',
+        '--vflip', '1',
+        '--hflip', '1',
         '--framerate', '15',
         '--codec', 'mjpeg',
         '-n', 
@@ -472,6 +637,17 @@ def camera_stream():
     """Video stream route"""
     return Response(generate_frames(),
                     mimetype='multipart/x-mixed-replace; boundary=frame')
+    
+# --- Default route om filen inte hittas (Catch All)
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def catch_all(path):
+    # Kolla om filen faktiskt finns i din build-mapp (t.ex. bilder eller css)
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
+    else:
+        # Annars skicka index.html så att React Router kan ta över
+        return send_from_directory(app.static_folder, 'index.html')
 
 
 
@@ -480,11 +656,17 @@ if __name__ == '__main__':
     try:
 
         # Starta tråden som "daemon" så den dör när huvudprogrammet dör
+        # Tråd för knappar
         t1 = threading.Thread(target=button_control_thread, daemon=True)
         t1.start()
 
+        # Tråd för automatiska rutiner
         t2 = threading.Thread(target=automation_routine_thread, daemon=True)
         t2.start()
+
+        # Tråd för data insamling och visualisering i grafer 
+        t3 = threading.Thread(target=history_collector_thread, daemon=True)
+        t3.start()
 
         # Körs på port 5000 för att matcha hans frontend-anrop
         app.run(host='0.0.0.0', port=5000, debug=False)

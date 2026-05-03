@@ -2,7 +2,7 @@ import { ComponentType } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
-type ControlType = 'curtain' | 'led';
+type ControlType = 'curtain' | 'led' | 'camera';
 
 interface FeaturedControlCardProps {
   name: string;
@@ -25,9 +25,12 @@ export function FeaturedControlCard({
   onDeactivate,
   loading,
 }: FeaturedControlCardProps) {
+  // Kameran är "aktiv" i UI:t när den tar en bild
   const isActive = type === 'curtain' 
     ? state === 'open' 
-    : Boolean(state);
+    : type === 'camera' 
+      ? loading 
+      : Boolean(state);
 
   return (
     <Card className="border-border">
@@ -44,23 +47,26 @@ export function FeaturedControlCard({
       </CardHeader>
       <CardContent>
         <div className="flex space-x-2">
+          {/* Vänster knapp: Capture för kamera, Open för gardin, On för LED */}
           <Button
-            variant={isActive ? 'default' : 'outline'}
+            variant={type === 'camera' ? 'default' : (isActive ? 'default' : 'outline')}
             size="sm"
             onClick={onActivate}
             disabled={loading || (type === 'curtain' && state === 'open')}
             className="flex-1"
           >
-            {type === 'curtain' ? 'Open' : 'On'}
+            {type === 'camera' ? (loading ? 'Capturing...' : 'Capture') : (type === 'curtain' ? 'Open' : 'On')}
           </Button>
+
+          {/* Höger knapp: Record (Inaktiv), Close för gardin, Off för LED */}
           <Button
-            variant={!isActive ? 'default' : 'outline'}
+            variant={!isActive && type !== 'camera' ? 'default' : 'outline'}
             size="sm"
             onClick={onDeactivate}
-            disabled={loading || (type === 'curtain' && state === 'closed')}
+            disabled={loading || type === 'camera' || (type === 'curtain' && state === 'closed')}
             className="flex-1"
           >
-            {type === 'curtain' ? 'Close' : 'Off'}
+            {type === 'camera' ? 'Record' : (type === 'curtain' ? 'Close' : 'Off')}
           </Button>
         </div>
       </CardContent>

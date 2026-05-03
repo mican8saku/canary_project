@@ -2,7 +2,7 @@ import RPi.GPIO as GPIO
 import time
 
 # --- Inställningar ---
-LED_PIN = 18
+LED_PIN = 12
 BUTTON_PIN = 21
 
 # Variabel för att hålla koll på om lampan ska vara på eller av
