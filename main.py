@@ -221,13 +221,13 @@ def button_control_thread():
             motor.kor_gardin(0.05, -1)
             curtain_state = min(100, curtain_state + 2)
             needs_saving = True
-            manual_override_until = time.time() + (30 * 60)
+            manual_override_until = time.time() + (1 * 60)
             
         elif down_pressed and curtain_state > 0:
             motor.kor_gardin(0.05, 1)
             curtain_state = max(0, curtain_state - 2)
             needs_saving = True
-            manual_override_until = time.time() + (30 * 60)
+            manual_override_until = time.time() + (1 * 60)
         
         else:
             if needs_saving:
@@ -244,20 +244,24 @@ def automation_routine_thread():
 
     while True:
         try:
-
-            # Inuti while True:
-            motion_now = GPIO.input(PIR_PIN) == 1 if IS_PI else False
-            if motion_now:
-            # 1. För logiken (sekunder)
-                last_motion_time = time.time() 
-                # 2. För API/Frontend (klockslag)
-                last_motion_at = datetime.now().isoformat()
-                # 3. Tänd debug-lampan
-                if IS_PI: GPIO.output(LED_PIN, GPIO.HIGH)
-            else:
-                if IS_PI: GPIO.output(LED_PIN, GPIO.LOW)
-            nu = datetime.now()
+            # 1. Hämta senaste datan från history_collector (som körs 2 ggr/sek)
+            motion_now = latest_sensor_data.get("motion_now", False)
+            current_lux = latest_sensor_data.get("lux", 350.0)
+            
             current_time_ts = time.time()
+            nu = datetime.now()
+            
+            # Uppdatera rörelsetid oavsett override
+            if motion_now:
+                last_motion_time = current_time_ts
+                GPIO.output(LED_PIN, GPIO.HIGH)
+            else:
+                GPIO.output(LED_PIN, GPIO.LOW)
+            
+            # 2. CHECK: MANUAL OVERRIDE (Här räcker det med 1 min som du sätter i API:et)
+            if current_time_ts < manual_override_until:
+                time.sleep(1) 
+                continue
             
             # --- TIDSBERÄKNING ---
             upp_obj = datetime.strptime(auto_settings["time_up"], "%H:%M").replace(
@@ -268,60 +272,43 @@ def automation_routine_thread():
             morgon_start = upp_obj - timedelta(hours=auto_settings["window_hours"])
             kvall_start = ner_obj - timedelta(hours=auto_settings["window_hours"])
 
-            # --- MANUELL ÖVERSTYRNING ---
-            if current_time_ts < manual_override_until:
-                time.sleep(5)
-                continue
-
             # --- GARDIN AUTOMATION ---
             if auto_settings["curtain_routine_active"] and not is_moving:
-                motion_detected = GPIO.input(PIR_PIN) == GPIO.HIGH
-                if motion_detected:
-                    last_motion_time = current_time_ts
-
-                # 1. DJUP NATT (Efter ner_obj eller innan morgon_start)
+                # Använd motion_now variabeln vi redan har istället för ny GPIO-läsning
+                
+                # 1. DJUP NATT
                 if nu >= ner_obj or nu < morgon_start:
                     if curtain_state > 0:
                         start_curtain_thread(0, "Night-time: Strict close")
 
-                # 2. MORGON-FÖNSTER (Fågeln får välja att vakna tidigt)
+                # 2. MORGON-FÖNSTER
                 elif morgon_start <= nu < upp_obj:
-                    if motion_detected and curtain_state < 100:
+                    if motion_now and curtain_state < 100:
                         start_curtain_thread(100, "Morning: Bird is awake")
 
-                # 3. STANDARD DAGTID (Tvingat öppet mellan upp_obj och kvall_start)
+                # 3. STANDARD DAGTID
                 elif upp_obj <= nu < kvall_start:
                     if curtain_state < 100:
                         start_curtain_thread(100, "Daytime: Open")
 
-                # 4. KVÄLLS-FÖNSTER (Smart nattning)
+                # 4. KVÄLLS-FÖNSTER
                 elif kvall_start <= nu < ner_obj:
                     idle_seconds = current_time_ts - last_motion_time
-                    
-                    # Om det varit stilla tillräckligt länge -> STÄNG
                     if idle_seconds >= (auto_settings["still_minutes"] * 60):
                         if curtain_state > 0:
-                            start_curtain_thread(0, "Evening: Bird is sleeping (Stillness)")
-                    
-                    # VIKTIGT: Här finns ingen "else: öppna". 
-                    # Om gardinen redan är stängd, så rör vi den inte, 
-                    # även om PIR ser rörelse nu. Fågeln får sova ifred.
+                            start_curtain_thread(0, "Evening: Bird is sleeping")
 
             # --- LED AUTOMATION ---
-            # Lampan följer strikt det aktiva fönstret
-            if auto_settings["led_routine_active"] and current_time_ts > manual_override_until:
-                lux = tsl_sensor.lux
+            if auto_settings["led_routine_active"]:
                 if upp_obj <= nu < ner_obj:
-                    # Tänd bara om gardinen är öppen (annars lyser vi på en stängd gardin)
                     if curtain_state > 50:
-                        if lux < auto_settings["lux_threshold"] and not auto_light_active:
+                        if current_lux < auto_settings["lux_threshold"] and not auto_light_active:
                             light.set_light(True)
                             auto_light_active = True
-                        elif lux >= auto_settings["lux_threshold"] and auto_light_active:
+                        elif current_lux >= auto_settings["lux_threshold"] and auto_light_active:
                             light.set_light(False)
                             auto_light_active = False
                     else:
-                        # Släck om gardinen stängs för kvällen
                         if auto_light_active:
                             light.set_light(False)
                             auto_light_active = False
@@ -333,7 +320,7 @@ def automation_routine_thread():
         except Exception as e:
             print(f"Automation error: {e}")
         
-        time.sleep(0.4)
+        time.sleep(1)
 
 def start_curtain_thread(target, reason):
     """Hjälpfunktion för att starta gradvis flytt i en egen tråd"""
@@ -349,9 +336,9 @@ def history_collector_thread():
     motion_accumulator = 0
     loop_count = 0
 
-    while True:
+    while True: 
         try:
-            # --- 1. LÄS SENSORER (Var 10:e sekund) ---
+            # --- 1. LÄS SENSORER (Varje sekund) --
             current_temp = latest_sensor_data["temp"] # Behåll gammalt värde som fallback
             current_lux = 350.0
             motion_now = False
@@ -388,7 +375,7 @@ def history_collector_thread():
 
             # --- 2. LOGGA TILL HISTORIK (Varje minut: loop_count 6 * 10s) ---
             loop_count += 1
-            if loop_count >= 6:
+            if loop_count >= 120:
                 timestamp = datetime.now().strftime("%H:%M")
 
                 # Spara till minnet
@@ -411,7 +398,7 @@ def history_collector_thread():
         except Exception as e:
             print(f"Critical error in history thread: {e}")
 
-        time.sleep(10)
+        time.sleep(0.5)
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
@@ -490,7 +477,7 @@ def curtain_open():
     if is_moving:
         return jsonify({"ok": False, "error": "Already moving"}), 400
     
-    manual_override_until = time.time() + (30 * 60)
+    manual_override_until = time.time() + (1 * 60)
     # Starta en engångs-tråd för denna specifika körning
     threading.Thread(target=move_curtain_gradually, args=(100,)).start()
     return jsonify({"ok": True, "curtainState": curtain_state})
@@ -501,7 +488,7 @@ def curtain_close():
     if is_moving:
         return jsonify({"ok": False, "error": "Already moving"}), 400
 
-    manual_override_until = time.time() + (30 * 60)
+    manual_override_until = time.time() + (1 * 60)
     
     threading.Thread(target=move_curtain_gradually, args=(0,)).start()
 
