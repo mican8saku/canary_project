@@ -615,20 +615,23 @@ def generate_frames():
         # Vi läser dataströmmen och letar efter dessa markörer
         buffer = b""
         while True:
-            chunk = process.stdout.read(4096)
+            chunk = process.stdout.read(8192)
             if not chunk:
                 break
             buffer += chunk
             
-            # Leta efter start och slut på en JPEG-bild
+        # Hitta ALLA kompletta bilder i den nuvarande bufferten
+        while b'\xff\xd8' in buffer and b'\xff\xd9' in buffer:
             start = buffer.find(b'\xff\xd8')
             end = buffer.find(b'\xff\xd9')
-            
-            if start != -1 and end != -1 and end > start:
+            if end > start:
                 jpg = buffer[start:end+2]
                 buffer = buffer[end+2:]
                 yield (b'--frame\r\n'
-                       b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
+                    b'Content-Type: image/jpeg\r\n\r\n' + jpg + b'\r\n')
+            else:
+                # Om vi har en slutmarkerare FÖRE en startmarkerare, rensa skräp
+                buffer = buffer[end+2:]
     finally:
         process.terminate()
 

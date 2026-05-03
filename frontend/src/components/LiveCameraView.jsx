@@ -22,7 +22,7 @@ export default function LiveCameraView({ isCapturing }) { // Ta emot isCapturing
   }, [isCapturing, error, reloadStream]);
 
   return (
-    <div className="relative aspect-[3/4] max-h-[520px] mx-auto rounded-[2.5rem] overflow-hidden bg-slate-900 border border-white/5 shadow-2xl">
+    <div className="relative w-full aspect-[3/4] max-h-[70vh] mx-auto rounded-[2rem] overflow-hidden bg-slate-950 border border-white/5 shadow-2xl">
       {error ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-white/40 p-6 text-center">
           <CameraOff className="w-12 h-12 mb-3 opacity-20" />
@@ -40,12 +40,12 @@ export default function LiveCameraView({ isCapturing }) { // Ta emot isCapturing
             key={key}
             src={`${BASE_URL}/camera/stream?t=${key}`} 
             alt="Live Bird Stream"
-            className="w-full h-full object-cover" 
+            className="w-full h-full object-contain" 
             onError={() => setError(true)}
           />
           
           {/* Status Overlay */}
-          <div className="absolute top-5 left-5 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/10">
             {isCapturing ? (
               <>
                 <span className="w-2 h-2 bg-amber-500 rounded-full animate-ping" />
