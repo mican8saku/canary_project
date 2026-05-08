@@ -38,7 +38,7 @@ python3 -m venv env
 ```
 - **Mac / Linux / Raspberry Pi:**
 ```
-source env/bin/activate
+source venv/bin/activate
 ```
 - **Windows (PowerShell):**
 ```
