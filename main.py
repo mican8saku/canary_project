@@ -57,7 +57,7 @@ auto_settings = {
 
 
 latest_sensor_data = {
-    "temp": 22.2,
+    "temp": 33.3,
     "lux": 0.0,
     "last_updated": None
 }
