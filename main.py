@@ -412,13 +412,11 @@ def camera_producer_thread():
         cmd = [
             'rpicam-vid', '-t', '0', 
             '--inline', 
-            '--width', '1280', '--height', '960', # HD-upplösning (16:9 för bredare bild)
-            '--vflip', '1', '--hflip', '1', 
-            '--framerate', '15',           # 20 FPS är flytande nog men ger bättre bild
+            '--width', '1280', '--height', '960', # Bas-upplösning (liggande)
+            '--rotation', '90',                   # Roterar den till 960x1280 (stående)
+            '--vflip', '1', '--hflip', '1',       # Behåll dessa om bilden är spegelvänd
+            '--framerate', '20', 
             '--codec', 'mjpeg',
-            '--denoise', 'cdn_off',        # Stänger av brusreducering som kan göra bilden "utsmetad"
-            '--shutter', '0',
-            '--quality', '90',
             '-n', '-o', '-'
         ]
         
