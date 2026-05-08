@@ -57,7 +57,7 @@ auto_settings = {
 
 
 latest_sensor_data = {
-    "temp": 22.2,
+    "temp": 33.3,
     "lux": 0.0,
     "last_updated": None
 }
@@ -405,41 +405,44 @@ def history_collector_thread():
         time.sleep(0.5)
         
 def camera_producer_thread():
-    """Läser från kameran i en loop och sparar senaste bilden globalt."""
     global current_frame
-    
-    if not IS_PI:
-        return
+    if not IS_PI: return
 
-    cmd = [
-        'rpicam-vid', '-t', '0', '--inline', '--width', '480', '--height', '640',
-        '--vflip', '1', '--hflip', '1', '--framerate', '15', '--codec', 'mjpeg',
-        '-n', '-o', '-'
-    ]
-    
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=0)
-    buffer = b""
-    
-    print("Camera Producer Thread: Started")
-    
-    try:
-        while True:
-            chunk = process.stdout.read(4096)
-            if not chunk: break
-            buffer += chunk
+    while True: # En yttre loop som startar om processen om den dör
+        cmd = [
+            'rpicam-vid', '-t', '0', 
+            '--inline', 
+            '--width', '960', '--height', '1280', # Direkt stående
+            '--vflip', '1', '--hflip', '1', 
+            '--framerate', '20', 
+            '--codec', 'mjpeg',
+            '-n', '-o', '-'
+        ]
+        
+        try:
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, bufsize=0)
+            buffer = b""
+            print("Camera Producer: Process started")
             
-            start = buffer.find(b'\xff\xd8')
-            end = buffer.find(b'\xff\xd9')
-            
-            if start != -1 and end != -1 and end > start:
-                jpg = buffer[start:end+2]
-                buffer = buffer[end+2:]
+            while True:
+                chunk = process.stdout.read(4096)
+                if not chunk: break
+                buffer += chunk
                 
-                # Spara bilden säkert så andra trådar kan läsa den
-                with frame_lock:
-                    current_frame = jpg
-    finally:
-        process.terminate()
+                start = buffer.find(b'\xff\xd8')
+                end = buffer.find(b'\xff\xd9')
+                
+                if start != -1 and end != -1 and end > start:
+                    jpg = buffer[start:end+2]
+                    buffer = buffer[end+2:]
+                    with frame_lock:
+                        current_frame = jpg
+        except Exception as e:
+            print(f"Camera Thread Error: {e}")
+        finally:
+            if 'process' in locals():
+                process.terminate()
+            time.sleep(2) # Vänta lite innan omstart vid fel
 
 # --- HJÄLPFUNKTIONER ---
 def get_curtain_str():
@@ -550,38 +553,29 @@ def light_toggle():
 
 @app.route('/camera/snapshot', methods=['GET'])
 def camera_snapshot():
-    global camera_process
+    global current_frame
     filename = f"capture_{int(time.time())}.jpg"
     filepath = UPLOAD_FOLDER / filename
     
     try:
-        # 1. Stoppa stream-processen om den körs
-        # Detta frigör kamerahårdvaran (imx708)
-        subprocess.run(['pkill', 'rpicam-vid'], check=False)
-        time.sleep(0.5) # Ge hårdvaran ett ögonblick att släppa taget
-
-        # 2. Ta bilden
-        print(f"Tar snapshot: {filename}")
-        subprocess.run([
-            'rpicam-still', 
-            '-o', str(filepath), 
-            '-t', '1000', 
-            '--width', '1536',  # Snapshots kan vara högupplösta
-            '--height', '2048', # Matchar 3:4 formatet stående
-            '--vflip', '1',
-            '--hflip', '1',
-            '--nopreview',
-            '--immediate'
-        ], check=True)
-
-        # 3. Starta om stream-processen i bakgrunden (valfritt om din stream-loop gör det själv)
-        # Om din stream sköts via en route, kommer den starta om vid nästa request.
+        with frame_lock:
+            if current_frame is None:
+                return jsonify({"ok": False, "error": "Kameran har inte startat än"}), 500
+            
+            with open(filepath, "wb") as f:
+                f.write(current_frame)
+        
+        print(f"Snapshot sparad från livestream: {filename}")
         
         return jsonify({
             "ok": True, 
             "filename": filename,
             "url": f"/static/gallery/{filename}"
         })
+
+    except Exception as e:
+        print(f"Snapshot-fel: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
     except subprocess.CalledProcessError as e:
         print(f"Kamera-fel: {e}")
