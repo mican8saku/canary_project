@@ -154,9 +154,19 @@ try:
     
     GPIO.output(LED_PIN, GPIO.LOW)
 
-    dht_device = adafruit_dht.DHT11(board.D26)
-    i2c = board.I2C()
-    tsl_sensor = adafruit_tsl2591.TSL2591(i2c)
+    try:
+        dht_device = adafruit_dht.DHT11(board.D26)
+    except Exception as e:
+        print(f"DHT11 kunde inte starta: {e}")
+        dht_device = None
+
+    try:
+        i2c = board.I2C()
+        tsl_sensor = adafruit_tsl2591.TSL2591(i2c)
+    except Exception as e:
+        print(f"Ljus-sensor kunde inte starta: {e}")
+        tsl_sensor = None
+        
     motor.setup_motors()
     
     print("--- System Ready on Raspberry Pi ---")
