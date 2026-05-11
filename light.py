@@ -21,7 +21,8 @@ def set_light(state, color=(255, 180, 50), duration=1.5):
     if state:
         # TÄND / FADE IN
         pixels.fill(color)
-        target = 0.8 # Vi kör på 80% som max för att spara ström/ögon
+        # target = 0.8 # Vi kör på 80% som max för att spara ström/ögon
+        target = 1
         current_b = pixels.brightness
         step_size = (target - current_b) / steps
         
@@ -43,3 +44,9 @@ def set_light(state, color=(255, 180, 50), duration=1.5):
 
 def get_brightness():
     return pixels.brightness
+
+def set_brightness_linear(percent, color=(255, 180, 50)):
+    # Mappa 0-100 till brightness 0.0-1.0
+    target = (percent / 100.0) * 1
+    pixels.fill(color)
+    pixels.brightness = target
