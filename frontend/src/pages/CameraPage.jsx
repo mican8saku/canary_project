@@ -14,7 +14,7 @@ export default function CameraPage() {
 
   const fetchGallery = async () => {
     try {
-      const response = await fetch(`${BASE_URL}/api/gallery`);
+      const response = await fetch(`${BASE_URL}/camera/gallery`);
       const data = await response.json();
       if (data.ok) setImages(data.images);
     } catch (err) {

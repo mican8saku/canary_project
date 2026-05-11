@@ -43,7 +43,7 @@ export default function DataPage() {
     if (showLoader) setLoading(true);
     setIsRefreshing(true);
     
-    fetch(`${BASE_URL}/api/sensors`)
+    fetch(`${BASE_URL}/sensors`)
       .then(res => res.json())
       .then(json => {
         setData(json);

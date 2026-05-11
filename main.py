@@ -31,6 +31,7 @@ UPLOAD_FOLDER.mkdir(parents=True, exist_ok=True)
 curtain_state = 0  # 0 = stängd, 100 = öppen
 is_moving = False
 light_state = False
+light_level = 0
 last_motion_at = datetime.now(timezone.utc).isoformat()
 MOTION_IDLE_THRESHOLD = 30 # Sekunder innan fågeln räknas som inaktiv
 camera_process = None
@@ -74,6 +75,8 @@ def save_state():
     try:
         data = {
             "curtainState": curtain_state,
+            "lightState": light_state,
+            "lightLevel": light_level,
             "lastMotionAt": last_motion_at,
             "autoSettings": auto_settings  # Spara även inställningarna
         }
@@ -475,7 +478,7 @@ def get_bird_status(motion_now):
 
 # --- INTEGRATION ROUTES (För Webbapp gränssnitt) ---
 
-@app.route('/api/sensors', methods=['GET'])
+@app.route('/sensors', methods=['GET'])
 def get_sensor_history():
     """Returnerar insamlad historik till DataPage"""
     return jsonify(sensor_history)
@@ -494,6 +497,7 @@ def status():
         "stateFileExists": STATE_FILE.exists(),
         "temperature": latest_sensor_data["temp"],  # Från tråden
         "curtainState": curtain_state, 
+        "lightState": light_state,
         "birdStatus": get_bird_status(latest_sensor_data["motion_now"]),
         "lastMotionAt": last_motion_at,
         "light": latest_sensor_data["lux"],        # Från tråden
@@ -541,6 +545,25 @@ def curtain_close():
 
     return jsonify({"ok": True, "curtainState": curtain_state})
 
+# Tänkt att användas för haptisk nobb för annan projektgrupp
+@app.route('/curtain/set', methods=['POST'])
+def curtain_set():
+    global manual_override_until
+    data = request.get_json()
+    target = data.get('position') # Förväntar sig 0-100
+    
+    if target is None or not (0 <= target <= 100):
+        return jsonify({"ok": False, "error": "Invalid position"}), 400
+    
+    if is_moving:
+        return jsonify({"ok": False, "error": "Already moving"}), 400
+
+    manual_override_until = time.time() + (1 * 60)
+    
+    threading.Thread(target=move_curtain_gradually, args=(target,)).start()
+    
+    return jsonify({"ok": True, "target": target})
+
 @app.route('/light/toggle', methods=['POST'])
 def light_toggle():
     global light_state
@@ -553,6 +576,24 @@ def light_toggle():
         "ok": True, 
         "lightOn": light_state
     })
+    
+# Tänkt att användas för haptisk nobb för annan projektgrupp
+@app.route('/light/dim', methods=['POST'])
+def light_dim():
+    global light_state, light_level
+    data = request.get_json()
+    level = data.get('level') # 0-100 från nobben
+    
+    if level is not None:
+        light_level = level
+        light_state = level > 0 # Om nivån är över 0, räknas den som "True" (tänd)
+        
+        # Uppdatera hårdvaran
+        if IS_PI:
+            light.set_brightness_linear(level)
+            
+        return jsonify({"ok": True, "level": level, "lightState": light_state})
+    return jsonify({"ok": False}), 400
 
 @app.route('/camera/snapshot', methods=['GET'])
 def camera_snapshot():
@@ -586,7 +627,7 @@ def camera_snapshot():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-@app.route('/api/gallery', methods=['GET'])
+@app.route('/camera/gallery', methods=['GET'])
 def get_gallery():
     """Returnerar en lista på alla sparade bilder i galleriet"""
     try:
