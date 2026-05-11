@@ -86,12 +86,14 @@ def save_state():
         print(f"Save error: {e}")
 
 def load_state():
-    global curtain_state, last_motion_at, auto_settings
+    global curtain_state, light_state, light_level, last_motion_at, auto_settings
     if STATE_FILE.exists():
         try:
             with open(STATE_FILE, "r") as f:
                 data = json.load(f)
                 curtain_state = data.get("curtainState", 0)
+                light_state = data.get("lightState", False)
+                light_level = data.get("lightLevel", 0)
                 last_motion_at = data.get("lastMotionAt", last_motion_at)
                 # Läs in sparade inställningar om de finns
                 if "autoSettings" in data:
@@ -144,7 +146,6 @@ try:
     BUTTON_DOWN = 20
     LEDSTRIP_BUTTON = 21
     
-    GPIO.setup(PIR_PIN, GPIO.IN)
     GPIO.setup(LED_PIN, GPIO.OUT)
     GPIO.setup(PIR_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
     GPIO.setup(BUTTON_UP, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -498,6 +499,7 @@ def status():
         "temperature": latest_sensor_data["temp"],  # Från tråden
         "curtainState": curtain_state, 
         "lightState": light_state,
+        "lightLevel": light_level,
         "birdStatus": get_bird_status(latest_sensor_data["motion_now"]),
         "lastMotionAt": last_motion_at,
         "light": latest_sensor_data["lux"],        # Från tråden
