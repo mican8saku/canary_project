@@ -359,6 +359,30 @@ def start_curtain_thread(target, reason):
     if not is_moving:
         print(f"Trigger: {reason} -> Moving to {target}%")
         threading.Thread(target=move_curtain_gradually, args=(target,), daemon=True).start()
+        
+def dht_reader_thread():
+    global latest_sensor_data
+    print("DHT Reader started.", flush=True)
+    while True:
+        try:
+            # Läs av sensorn
+            t = dht_device.temperature
+            h = dht_device.humidity
+            
+            if t is not None:
+                latest_sensor_data["temp"] = round(t, 1)
+            if h is not None:
+                latest_sensor_data["hum"] = round(h, 1)
+                
+        except RuntimeError:
+            # Vanligt läsfel, vi gör inget
+            pass
+        except Exception as e:
+            # Om sensorn är helt bortkopplad
+            # print(f"DHT Error: {e}") 
+            pass
+            
+        time.sleep(2) # DHT11 behöver minst 2 sekunder mellan läsningar
 
 def history_collector_thread():
     global sensor_history, latest_sensor_data, last_motion_at
@@ -383,8 +407,6 @@ def history_collector_thread():
                 if loop_count % 20 == 0: # Var 10:e sek
                     try:
                         latest_sensor_data["lux"] = round(tsl_sensor.lux, 1)
-                       #  t = dht_device.temperature
-                       # if t is not None: latest_sensor_data["temp"] = t
                     except: pass
             else:
                 # Mock-data
@@ -726,6 +748,10 @@ if __name__ == '__main__':
         # Tråd för att strömma live video frames
         t4 = threading.Thread(target=camera_producer_thread, daemon=True)
         t4.start()
+        
+        # Tråd för att läsa av DHT-sensorn separat
+        t5 = threading.Thread(target=dht_reader_thread, daemon=True)
+        t5.start()
 
         # Körs på port 5000 för att matcha hans frontend-anrop
         app.run(host='0.0.0.0', port=5000, debug=False)
