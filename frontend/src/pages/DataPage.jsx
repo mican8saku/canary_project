@@ -67,14 +67,16 @@ export default function DataPage() {
 
   const getFilteredData = (rawData) => {
     if (!rawData) return [];
+    // Uppdaterat för 30-sekunders intervall (2 punkter per minut)
+    const pointsPerMinute = 2; 
     const modes = {
-      '1h': 60,
-      '3h': 180,
-      '6h': 360,
-      '12h': 720,
-      '24h': 1440
+      '1h': 60 * pointsPerMinute,
+      '3h': 180 * pointsPerMinute,
+      '6h': 360 * pointsPerMinute,
+      '12h': 720 * pointsPerMinute,
+      '24h': 1440 * pointsPerMinute
     };
-    return rawData.slice(-(modes[viewMode] || 1440));
+    return rawData.slice(-(modes[viewMode] || 120));
   };
 
   return (
@@ -125,8 +127,8 @@ export default function DataPage() {
           <ChartContainer title="Bird Activity" icon={Activity} colorClass="text-green-500">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart 
-              key={`pir-${viewMode}`}
-              data={getFilteredData(data.pir)}
+                key={`pir-${viewMode}`}
+                data={getFilteredData(data.pir)}
               >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
@@ -135,7 +137,8 @@ export default function DataPage() {
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
-                  minTickGap={50}
+                  minTickGap={60}
+                  padding={{ left: 10, right: 10 }}
                 />
                 <YAxis hide domain={[0, 'auto']} />
                 <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
@@ -155,8 +158,8 @@ export default function DataPage() {
           <ChartContainer title="Air Temperature" icon={Thermometer} colorClass="text-orange-500">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart 
-              key={`temperature-${viewMode}`}
-              data={getFilteredData(data.temperature)}
+                key={`temperature-${viewMode}`}
+                data={getFilteredData(data.temperature)}
               >
                 <defs>
                   <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
@@ -171,10 +174,11 @@ export default function DataPage() {
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false}
-                  minTickGap={50}
+                  minTickGap={60}
+                  padding={{ left: 10, right: 10 }}
                 />
                 <YAxis 
-                  domain={[15, 'auto']} 
+                  domain={['dataMin - 1', 'dataMax + 1']} 
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
@@ -200,8 +204,8 @@ export default function DataPage() {
           <ChartContainer title="Light Intensity" icon={Sun} colorClass="text-yellow-500">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart 
-              key={`light-${viewMode}`}
-              data={getFilteredData(data.light)}
+                key={`light-${viewMode}`}
+                data={getFilteredData(data.light)}
               >
                 <defs>
                   <linearGradient id="colorLight" x1="0" y1="0" x2="0" y2="1">
@@ -216,7 +220,8 @@ export default function DataPage() {
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
-                  minTickGap={50} 
+                  minTickGap={60}
+                  padding={{ left: 10, right: 10 }}
                 />
                 <YAxis 
                   domain={[0, 'auto']} 

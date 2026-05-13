@@ -58,7 +58,7 @@ auto_settings = {
 
 
 latest_sensor_data = {
-    "temp": 33.3,
+    "temp": 22.2,
     "lux": 0.0,
     "last_updated": None
 }
@@ -378,7 +378,7 @@ def history_collector_thread():
                     except: pass
             else:
                 # Mock-data
-                latest_sensor_data["lux"] = 350.0
+                latest_sensor_data["lux"] = 0
                 latest_sensor_data["motion_now"] = False
 
             latest_sensor_data["last_updated"] = datetime.now().strftime("%H:%M:%S")
