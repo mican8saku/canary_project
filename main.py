@@ -366,7 +366,7 @@ def history_collector_thread():
     
     motion_accumulator = 0
     loop_count = 0
-    LOG_INTERVAL_LOOPS = 2 # 60 * 0.5s = 30 sekunder
+    LOG_INTERVAL_LOOPS = 60 # 60 * 0.5s = 30 sekunder
 
     while True: 
         print("Loop körs...", flush=True)
