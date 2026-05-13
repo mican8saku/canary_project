@@ -109,13 +109,17 @@ def load_history():
         try:
             with open(HISTORY_FILE, 'r') as f:
                 data = json.load(f)
-                # Säkerställ att alla nycklar finns
-                for key in ["temperature", "light", "pir"]:
-                    if key in data:
-                        sensor_history[key] = data[key]
-            print("History loaded from disk.")
+                # Viktigt: Validera att vi fick rätt struktur
+                if isinstance(data, dict) and "temperature" in data:
+                    sensor_history = data
+                    print("Historik laddad!")
+                    return
         except Exception as e:
-            print(f"Error loading history: {e}")
+            print(f"Kunde inte ladda historik: {e}")
+    
+    # Om filen inte fanns eller var trasig, initiera tom struktur
+    print("Skapar ny tom historik.")
+    sensor_history = {"temperature": [], "light": [], "pir": []}
             
 def save_history():
     try:
