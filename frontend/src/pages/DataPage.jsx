@@ -164,7 +164,10 @@ export default function DataPage() {
                   minTickGap={60}
                   padding={{ left: 10, right: 10 }}
                 />
-                <YAxis hide domain={[0, 'auto']} />
+                <YAxis hide 
+                domain={[0, 'auto']}
+                unit="Sec / Minute"
+                 />
                 <Tooltip 
                   labelFormatter={formatXAxis}
                   contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} 

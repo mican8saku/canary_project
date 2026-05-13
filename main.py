@@ -58,7 +58,7 @@ auto_settings = {
 
 
 latest_sensor_data = {
-    "temp": 22.2,
+    "temp": 0.0,
     "lux": 0.0,
     "last_updated": None
 }
@@ -70,7 +70,7 @@ sensor_history = {
     "pir": []
 }
 
-MAX_POINTS = 2880  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
+MAX_POINTS = 1440 
 
 def save_state():
     try:
@@ -126,7 +126,7 @@ def save_history():
     try:
         with open(HISTORY_FILE, 'w') as f:
             json.dump(sensor_history, f)
-            print(f"--- Historik sparad ({len(sensor_history['temperature'])} punkter) ---")
+            # print(f"--- Historik sparad ({len(sensor_history['temperature'])} punkter) ---")
         # print(f"Fil sparad till {HISTORY_FILE}") 
     except Exception as e:
         print(f"Error saving history: {e}")
@@ -390,10 +390,9 @@ def history_collector_thread():
     
     motion_accumulator = 0
     loop_count = 0
-    LOG_INTERVAL_LOOPS = 60 # 60 * 0.5s = 30 sekunder
+    LOG_INTERVAL_LOOPS = 240 # 0.25s * 240 = 60 motsvarar 60 sekunder
 
     while True: 
-        print("Loop körs...", flush=True)
         try:
             # --- 1. LÄS SENSORER (Körs VARJE 0.5 sekund) ---
             if IS_PI:
@@ -415,16 +414,17 @@ def history_collector_thread():
 
             latest_sensor_data["last_updated"] = datetime.now().strftime("%H:%M:%S")
 
-            # --- 2. LOGGA TILL HISTORIK (Var 30:e sekund) ---
+            # --- 2. LOGGA TILL HISTORIK (Var 60:e sekund) ---
             loop_count += 1
             if loop_count >= LOG_INTERVAL_LOOPS:
                 timestamp = datetime.now().isoformat()
 
+                active_seconds = motion_accumulator / 4 # Delar med 4 för att få antalet rörelser avlästa matcha 60 sekunder. 
+                
                 # Spara snittet/summan till historiken
                 sensor_history["temperature"].append({"time": timestamp, "value": latest_sensor_data["temp"]})
                 sensor_history["light"].append({"time": timestamp, "value": latest_sensor_data["lux"]})
-                # Nu blir pir-värdet hur många gånger rörelse sågs under de 30 sekunderna
-                sensor_history["pir"].append({"time": timestamp, "value": motion_accumulator})
+                sensor_history["pir"].append({"time": timestamp, "value": active_seconds})
 
                 # Håll 24h historik
                 for key in sensor_history:
@@ -439,7 +439,7 @@ def history_collector_thread():
         except Exception as e:
             print(f"Critical error in history thread: {e}")
 
-        time.sleep(0.5)
+        time.sleep(0.25)
         
 def camera_producer_thread():
     global current_frame
