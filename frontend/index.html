@@ -2,9 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/logo192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BirdNest">
+    <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Parande - SmartNest</title>
+    <style>
+      html, body {
+        /* Förhindrar att man kan "dra" ner sidan så den studsar */
+        overscroll-behavior-y: none;
+        /* Förhindrar att man kan zooma in genom att dubbelklicka (valfritt) */
+        touch-action: manipulation;
+        /* Gör att sidan alltid fyller hela skärmen utan scroll-hack */
+        height: 100%;
+        overflow-x: hidden;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
