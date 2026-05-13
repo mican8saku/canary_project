@@ -116,6 +116,7 @@ def load_history():
                     return
         except Exception as e:
             print(f"Kunde inte ladda historik: {e}")
+    save_history()
     
     # Om filen inte fanns eller var trasig, initiera tom struktur
     print("Skapar ny tom historik.")
@@ -125,6 +126,9 @@ def save_history():
     try:
         with open(HISTORY_FILE, 'w') as f:
             json.dump(sensor_history, f)
+            f.flush() # Tvingar ut data ur Pythons buffer
+            os.fsync(f.fileno()) # Tvingar operativsystemet att skriva till SD-kortet
+        # print(f"Fil sparad till {HISTORY_FILE}") 
     except Exception as e:
         print(f"Error saving history: {e}")
         
