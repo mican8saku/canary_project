@@ -164,7 +164,7 @@ export default function DataPage() {
                   minTickGap={60}
                   padding={{ left: 10, right: 10 }}
                 />
-                <YAxis hide
+                <YAxis
                   domain={[0, 'auto']}
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
