@@ -386,7 +386,7 @@ def history_collector_thread():
             # --- 2. LOGGA TILL HISTORIK (Var 30:e sekund) ---
             loop_count += 1
             if loop_count >= LOG_INTERVAL_LOOPS:
-                timestamp = datetime.now().strftime("%H:%M")
+                timestamp = datetime.now().isoformat()
 
                 # Spara snittet/summan till historiken
                 sensor_history["temperature"].append({"time": timestamp, "value": latest_sensor_data["temp"]})

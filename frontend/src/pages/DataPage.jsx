@@ -39,6 +39,28 @@ export default function DataPage() {
   const [viewMode, setViewMode] = useState('24h');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // FIX: En samlad funktion för filtrering och sortering
+  const getFilteredData = (rawData) => {
+    if (!rawData || rawData.length === 0) return [];
+
+    // 1. Sortera baserat på tid (ISO-strängar sorteras korrekt alfabetiskt)
+    const sortedData = [...rawData].sort((a, b) => a.time.localeCompare(b.time));
+
+    // 2. Beräkna tidsfönster
+    const now = new Date();
+    const modesInMinutes = {
+      '1h': 60, '3h': 180, '6h': 360, '12h': 720, '24h': 1440
+    };
+    const limitMinutes = modesInMinutes[viewMode] || 1440;
+    const timeLimit = new Date(now.getTime() - limitMinutes * 60000);
+
+    // 3. Filtrera bort gammal data
+    return sortedData.filter(item => {
+      const itemDate = new Date(item.time);
+      return itemDate > timeLimit;
+    });
+  };
+
   const fetchData = (showLoader = true) => {
     if (showLoader) setLoading(true);
     setIsRefreshing(true);
@@ -65,18 +87,22 @@ export default function DataPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const getFilteredData = (rawData) => {
-    if (!rawData) return [];
-    // Uppdaterat för 30-sekunders intervall (2 punkter per minut)
-    const pointsPerMinute = 2; 
-    const modes = {
-      '1h': 60 * pointsPerMinute,
-      '3h': 180 * pointsPerMinute,
-      '6h': 360 * pointsPerMinute,
-      '12h': 720 * pointsPerMinute,
-      '24h': 1440 * pointsPerMinute
-    };
-    return rawData.slice(-(modes[viewMode] || 120));
+  // Formaterare för X-axeln
+  const formatXAxis = (str) => {
+    try {
+      const d = new Date(str);
+      if (isNaN(d.getTime())) return str; // Fallback om det inte är ett datum än
+      
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      
+      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      
+      if (isToday) return timeStr;
+      return `${d.getDate()}/${d.getMonth() + 1} ${timeStr}`;
+    } catch (e) {
+      return str;
+    }
   };
 
   return (
@@ -126,13 +152,11 @@ export default function DataPage() {
           
           <ChartContainer title="Bird Activity" icon={Activity} colorClass="text-green-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart 
-                key={`pir-${viewMode}`}
-                data={getFilteredData(data.pir)}
-              >
+              <AreaChart data={getFilteredData(data.pir)}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
+                  tickFormatter={formatXAxis}
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
@@ -141,9 +165,12 @@ export default function DataPage() {
                   padding={{ left: 10, right: 10 }}
                 />
                 <YAxis hide domain={[0, 'auto']} />
-                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
+                <Tooltip 
+                  labelFormatter={formatXAxis}
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} 
+                />
                 <Area 
-                  type="monotone" 
+                  type="stepAfter" 
                   dataKey="value" 
                   stroke="#22c55e" 
                   fill="#22c55e" 
@@ -157,10 +184,7 @@ export default function DataPage() {
 
           <ChartContainer title="Air Temperature" icon={Thermometer} colorClass="text-orange-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart 
-                key={`temperature-${viewMode}`}
-                data={getFilteredData(data.temperature)}
-              >
+              <AreaChart data={getFilteredData(data.temperature)}>
                 <defs>
                   <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#f97316" stopOpacity={0.4}/>
@@ -170,10 +194,11 @@ export default function DataPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
+                  tickFormatter={formatXAxis}
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
-                  axisLine={false}
+                  axisLine={false} 
                   minTickGap={60}
                   padding={{ left: 10, right: 10 }}
                 />
@@ -186,6 +211,7 @@ export default function DataPage() {
                   unit="°C" 
                 />
                 <Tooltip 
+                  labelFormatter={formatXAxis}
                   contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
                 />
                 <Area 
@@ -203,10 +229,7 @@ export default function DataPage() {
 
           <ChartContainer title="Light Intensity" icon={Sun} colorClass="text-yellow-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart 
-                key={`light-${viewMode}`}
-                data={getFilteredData(data.light)}
-              >
+              <AreaChart data={getFilteredData(data.light)}>
                 <defs>
                   <linearGradient id="colorLight" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#eab308" stopOpacity={0.2}/>
@@ -216,6 +239,7 @@ export default function DataPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
+                  tickFormatter={formatXAxis}
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
@@ -231,15 +255,18 @@ export default function DataPage() {
                   axisLine={false}
                   unit="lx" 
                 />
-                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
+                <Tooltip 
+                  labelFormatter={formatXAxis}
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} 
+                />
                 <Area 
-                type="monotone" 
-                dataKey="value" 
-                stroke="#eab308" 
-                fillOpacity={1} 
-                fill="url(#colorLight)" 
-                strokeWidth={2} 
-                isAnimationActive={false}
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke="#eab308" 
+                  fillOpacity={1} 
+                  fill="url(#colorLight)" 
+                  strokeWidth={2} 
+                  isAnimationActive={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
