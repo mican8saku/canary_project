@@ -39,8 +39,8 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
+      <Route path="/splash" element={<Splash />} />
       <Route element={<Layout />}>
-        <Route path="/splash" element={<Splash />} />
         <Route path="/" element={<Home />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/camera" element={<CameraPage />} />

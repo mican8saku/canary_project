@@ -6,7 +6,7 @@ export default function Splash() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const timer = setTimeout(() => navigate("/"), 2500);
+    const timer = setTimeout(() => navigate("/home"), 2500);
     return () => clearTimeout(timer);
   }, [navigate]);
 
@@ -36,7 +36,7 @@ export default function Splash() {
           transition={{ delay: 0.3 }}
           className="text-3xl font-bold text-white tracking-tight"
         >
-          SmartNest
+          Parande SmartNest
         </motion.h1>
         <motion.p
           initial={{ opacity: 0 }}
@@ -44,7 +44,7 @@ export default function Splash() {
           transition={{ delay: 0.5 }}
           className="text-sm text-white/60 mt-1"
         >
-          Your home, intelligently controlled
+          An intelligent and Automated Solution
         </motion.p>
       </motion.div>
 
