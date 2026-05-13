@@ -126,8 +126,7 @@ def save_history():
     try:
         with open(HISTORY_FILE, 'w') as f:
             json.dump(sensor_history, f)
-            f.flush() # Tvingar ut data ur Pythons buffer
-            os.fsync(f.fileno()) # Tvingar operativsystemet att skriva till SD-kortet
+            print(f"--- Historik sparad ({len(sensor_history['temperature'])} punkter) ---")
         # print(f"Fil sparad till {HISTORY_FILE}") 
     except Exception as e:
         print(f"Error saving history: {e}")
