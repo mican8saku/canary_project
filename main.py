@@ -226,6 +226,7 @@ def button_control_thread():
                 light.set_light(light_state)
             
             threading.Thread(target=run_light).start()
+            print(f"Satt ljus på: {light_state}")
             
             while GPIO.input(LEDSTRIP_BUTTON) == GPIO.LOW:
                 time.sleep(0.1)

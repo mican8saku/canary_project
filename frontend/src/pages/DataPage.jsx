@@ -168,7 +168,7 @@ export default function DataPage() {
                   minTickGap={50}
                 />
                 <YAxis 
-                  domain={[15, 35]} 
+                  domain={[15, 'auto']} 
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
@@ -209,7 +209,7 @@ export default function DataPage() {
                   minTickGap={50}
                 />
                 <YAxis 
-                  domain={[0, 1000]} 
+                  domain={[0, 'auto']} 
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
