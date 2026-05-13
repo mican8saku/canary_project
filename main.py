@@ -69,6 +69,7 @@ sensor_history = {
     "light": [],
     "pir": []
 }
+
 MAX_POINTS = 2880  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
 
 def save_state():
@@ -101,14 +102,6 @@ def load_state():
         except Exception as e:
             print(f"Load error: {e}")
 
-load_state()
-
-def save_history():
-    try:
-        with open(HISTORY_FILE, 'w') as f:
-            json.dump(sensor_history, f)
-    except Exception as e:
-        print(f"Error saving history: {e}")
 
 def load_history():
     global sensor_history
@@ -123,8 +116,17 @@ def load_history():
             print("History loaded from disk.")
         except Exception as e:
             print(f"Error loading history: {e}")
+            
+def save_history():
+    try:
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(sensor_history, f)
+    except Exception as e:
+        print(f"Error saving history: {e}")
+        
 
 # Kalla på denna i början av programmet (t.ex. efter load_state())
+load_state()
 load_history()
 
 # --- HÅRDVARA SETUP ---
