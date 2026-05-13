@@ -58,7 +58,7 @@ auto_settings = {
 
 
 latest_sensor_data = {
-    "temp": 33.3,
+    "temp": 0.0,
     "lux": 0.0,
     "last_updated": None
 }
@@ -69,7 +69,8 @@ sensor_history = {
     "light": [],
     "pir": []
 }
-MAX_POINTS = 1440  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
+
+MAX_POINTS = 1440 
 
 def save_state():
     try:
@@ -101,14 +102,6 @@ def load_state():
         except Exception as e:
             print(f"Load error: {e}")
 
-load_state()
-
-def save_history():
-    try:
-        with open(HISTORY_FILE, 'w') as f:
-            json.dump(sensor_history, f)
-    except Exception as e:
-        print(f"Error saving history: {e}")
 
 def load_history():
     global sensor_history
@@ -116,15 +109,31 @@ def load_history():
         try:
             with open(HISTORY_FILE, 'r') as f:
                 data = json.load(f)
-                # Säkerställ att alla nycklar finns
-                for key in ["temperature", "light", "pir"]:
-                    if key in data:
-                        sensor_history[key] = data[key]
-            print("History loaded from disk.")
+                # Viktigt: Validera att vi fick rätt struktur
+                if isinstance(data, dict) and "temperature" in data:
+                    sensor_history = data
+                    print("Historik laddad!")
+                    return
         except Exception as e:
-            print(f"Error loading history: {e}")
+            print(f"Kunde inte ladda historik: {e}")
+    save_history()
+    
+    # Om filen inte fanns eller var trasig, initiera tom struktur
+    print("Skapar ny tom historik.")
+    sensor_history = {"temperature": [], "light": [], "pir": []}
+            
+def save_history():
+    try:
+        with open(HISTORY_FILE, 'w') as f:
+            json.dump(sensor_history, f)
+            # print(f"--- Historik sparad ({len(sensor_history['temperature'])} punkter) ---")
+        # print(f"Fil sparad till {HISTORY_FILE}") 
+    except Exception as e:
+        print(f"Error saving history: {e}")
+        
 
 # Kalla på denna i början av programmet (t.ex. efter load_state())
+load_state()
 load_history()
 
 # --- HÅRDVARA SETUP ---
@@ -226,6 +235,7 @@ def button_control_thread():
                 light.set_light(light_state)
             
             threading.Thread(target=run_light).start()
+            print(f"Satt ljus på: {light_state}")
             
             while GPIO.input(LEDSTRIP_BUTTON) == GPIO.LOW:
                 time.sleep(0.1)
@@ -349,6 +359,30 @@ def start_curtain_thread(target, reason):
     if not is_moving:
         print(f"Trigger: {reason} -> Moving to {target}%")
         threading.Thread(target=move_curtain_gradually, args=(target,), daemon=True).start()
+        
+def dht_reader_thread():
+    global latest_sensor_data
+    print("DHT Reader started.", flush=True)
+    while True:
+        try:
+            # Läs av sensorn
+            t = dht_device.temperature
+            h = dht_device.humidity
+            
+            if t is not None:
+                latest_sensor_data["temp"] = round(t, 1)
+            if h is not None:
+                latest_sensor_data["hum"] = round(h, 1)
+                
+        except RuntimeError:
+            # Vanligt läsfel, vi gör inget
+            pass
+        except Exception as e:
+            # Om sensorn är helt bortkopplad
+            # print(f"DHT Error: {e}") 
+            pass
+            
+        time.sleep(2) # DHT11 behöver minst 2 sekunder mellan läsningar
 
 def history_collector_thread():
     global sensor_history, latest_sensor_data, last_motion_at
@@ -356,70 +390,56 @@ def history_collector_thread():
     
     motion_accumulator = 0
     loop_count = 0
+    LOG_INTERVAL_LOOPS = 240 # 0.25s * 240 = 60 motsvarar 60 sekunder
 
     while True: 
         try:
-            # --- 1. LÄS SENSORER (Varje sekund) --
-            current_temp = latest_sensor_data["temp"] # Behåll gammalt värde som fallback
-            current_lux = 350.0
-            motion_now = False
-
+            # --- 1. LÄS SENSORER (Körs VARJE 0.5 sekund) ---
             if IS_PI:
-                # Läs Ljus
-                try:
-                    current_lux = round(tsl_sensor.lux, 1)
-                except: pass
-
-                # Läs Rörelse
                 motion_now = (GPIO.input(PIR_PIN) == 1)
                 if motion_now:
                     last_motion_at = datetime.now().isoformat()
-                    motion_accumulator += 1 # För compounding-grafen
+                    motion_accumulator += 1
+                
+                latest_sensor_data["motion_now"] = motion_now
 
-                # Läs Temperatur (DHT11 är petig, läs var 10:e sek är lagom)
-                try:
-                    t = dht_device.temperature
-                    if t is not None:
-                        current_temp = t
-                except:
-                    pass # Behåll senaste lyckade läsningen
+                if loop_count % 20 == 0: # Var 10:e sek
+                    try:
+                        latest_sensor_data["lux"] = round(tsl_sensor.lux, 1)
+                    except: pass
             else:
-                # Mock-data för testmiljö
-                current_lux = 350.0
-                motion_now = False
+                # Mock-data
+                latest_sensor_data["lux"] = 0
+                latest_sensor_data["motion_now"] = False
 
-            # Uppdatera globala variabler för blixtsnabb /status
-            latest_sensor_data["temp"] = current_temp
-            latest_sensor_data["lux"] = current_lux
-            latest_sensor_data["motion_now"] = motion_now
             latest_sensor_data["last_updated"] = datetime.now().strftime("%H:%M:%S")
 
-            # --- 2. LOGGA TILL HISTORIK (Varje minut: loop_count 6 * 10s) ---
+            # --- 2. LOGGA TILL HISTORIK (Var 60:e sekund) ---
             loop_count += 1
-            if loop_count >= 120:
-                timestamp = datetime.now().strftime("%H:%M")
+            if loop_count >= LOG_INTERVAL_LOOPS:
+                timestamp = datetime.now().isoformat()
 
-                # Spara till minnet
-                sensor_history["temperature"].append({"time": timestamp, "value": current_temp})
-                sensor_history["light"].append({"time": timestamp, "value": current_lux})
-                sensor_history["pir"].append({"time": timestamp, "value": motion_accumulator})
+                active_seconds = motion_accumulator / 4 # Delar med 4 för att få antalet rörelser avlästa matcha 60 sekunder. 
+                
+                # Spara snittet/summan till historiken
+                sensor_history["temperature"].append({"time": timestamp, "value": latest_sensor_data["temp"]})
+                sensor_history["light"].append({"time": timestamp, "value": latest_sensor_data["lux"]})
+                sensor_history["pir"].append({"time": timestamp, "value": active_seconds})
 
-                # Håll 24h historik (1440 punkter)
+                # Håll 24h historik
                 for key in sensor_history:
-                    if len(sensor_history[key]) > 1440:
+                    if len(sensor_history[key]) > MAX_POINTS:
                         sensor_history[key].pop(0)
 
-                # Spara till fil (sensor_history.json)
                 save_history()
 
-                # Nollställ för nästa minut
                 motion_accumulator = 0
                 loop_count = 0
 
         except Exception as e:
             print(f"Critical error in history thread: {e}")
 
-        time.sleep(0.5)
+        time.sleep(0.25)
         
 def camera_producer_thread():
     global current_frame
@@ -728,6 +748,10 @@ if __name__ == '__main__':
         # Tråd för att strömma live video frames
         t4 = threading.Thread(target=camera_producer_thread, daemon=True)
         t4.start()
+        
+        # Tråd för att läsa av DHT-sensorn separat
+        t5 = threading.Thread(target=dht_reader_thread, daemon=True)
+        t5.start()
 
         # Körs på port 5000 för att matcha hans frontend-anrop
         app.run(host='0.0.0.0', port=5000, debug=False)

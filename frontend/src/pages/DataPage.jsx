@@ -39,6 +39,28 @@ export default function DataPage() {
   const [viewMode, setViewMode] = useState('24h');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // FIX: En samlad funktion för filtrering och sortering
+  const getFilteredData = (rawData) => {
+    if (!rawData || rawData.length === 0) return [];
+
+    // 1. Sortera baserat på tid (ISO-strängar sorteras korrekt alfabetiskt)
+    const sortedData = [...rawData].sort((a, b) => a.time.localeCompare(b.time));
+
+    // 2. Beräkna tidsfönster
+    const now = new Date();
+    const modesInMinutes = {
+      '1h': 60, '3h': 180, '6h': 360, '12h': 720, '24h': 1440
+    };
+    const limitMinutes = modesInMinutes[viewMode] || 1440;
+    const timeLimit = new Date(now.getTime() - limitMinutes * 60000);
+
+    // 3. Filtrera bort gammal data
+    return sortedData.filter(item => {
+      const itemDate = new Date(item.time);
+      return itemDate > timeLimit;
+    });
+  };
+
   const fetchData = (showLoader = true) => {
     if (showLoader) setLoading(true);
     setIsRefreshing(true);
@@ -65,16 +87,22 @@ export default function DataPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const getFilteredData = (rawData) => {
-    if (!rawData) return [];
-    const modes = {
-      '1h': 60,
-      '3h': 180,
-      '6h': 360,
-      '12h': 720,
-      '24h': 1440
-    };
-    return rawData.slice(-(modes[viewMode] || 1440));
+  // Formaterare för X-axeln
+  const formatXAxis = (str) => {
+    try {
+      const d = new Date(str);
+      if (isNaN(d.getTime())) return str; // Fallback om det inte är ett datum än
+      
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      
+      const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+      
+      if (isToday) return timeStr;
+      return `${d.getDate()}/${d.getMonth() + 1} ${timeStr}`;
+    } catch (e) {
+      return str;
+    }
   };
 
   return (
@@ -128,22 +156,34 @@ export default function DataPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
+                  tickFormatter={formatXAxis}
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
-                  minTickGap={50}
+                  minTickGap={60}
+                  padding={{ left: 10, right: 10 }}
                 />
-                <YAxis hide domain={[0, 'auto']} />
-                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
+                <YAxis
+                  domain={[0, 'auto']}
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  unit="s" 
+                 />
+                <Tooltip 
+                  labelFormatter={formatXAxis}
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} 
+                />
                 <Area 
-                  type="monotone" 
+                  type="stepAfter" 
                   dataKey="value" 
                   stroke="#22c55e" 
                   fill="#22c55e" 
                   fillOpacity={0.3} 
                   strokeWidth={3} 
-                  animationDuration={1500}
+                  isAnimationActive={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -161,21 +201,24 @@ export default function DataPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
-                  stroke="hsl(var(--muted-foreground))" 
-                  fontSize={10} 
-                  tickLine={false} 
-                  axisLine={false}
-                  minTickGap={50}
-                />
-                <YAxis 
-                  domain={[15, 35]} 
+                  tickFormatter={formatXAxis}
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
-                  unit="°" 
+                  minTickGap={60}
+                  padding={{ left: 10, right: 10 }}
+                />
+                <YAxis 
+                  domain={['dataMin - 1', 'dataMax + 1']} 
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  unit="°C" 
                 />
                 <Tooltip 
+                  labelFormatter={formatXAxis}
                   contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
                 />
                 <Area 
@@ -185,6 +228,7 @@ export default function DataPage() {
                   strokeWidth={3} 
                   fillOpacity={1} 
                   fill="url(#colorTemp)" 
+                  isAnimationActive={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -202,21 +246,35 @@ export default function DataPage() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
+                  tickFormatter={formatXAxis}
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
-                  minTickGap={50}
+                  minTickGap={60}
+                  padding={{ left: 10, right: 10 }}
                 />
                 <YAxis 
-                  domain={[0, 1000]} 
+                  domain={[0, 'auto']} 
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
-                  axisLine={false} 
+                  axisLine={false}
+                  unit="lx" 
                 />
-                <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
-                <Area type="monotone" dataKey="value" stroke="#eab308" fillOpacity={1} fill="url(#colorLight)" strokeWidth={2} />
+                <Tooltip 
+                  labelFormatter={formatXAxis}
+                  contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} 
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke="#eab308" 
+                  fillOpacity={1} 
+                  fill="url(#colorLight)" 
+                  strokeWidth={2} 
+                  isAnimationActive={false}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </ChartContainer>
