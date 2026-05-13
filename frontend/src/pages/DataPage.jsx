@@ -164,9 +164,13 @@ export default function DataPage() {
                   minTickGap={60}
                   padding={{ left: 10, right: 10 }}
                 />
-                <YAxis 
-                domain={[0, 'auto']}
-                unit="s"
+                <YAxis hide
+                  domain={[0, 'auto']}
+                  stroke="hsl(var(--muted-foreground))" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  unit="s" 
                  />
                 <Tooltip 
                   labelFormatter={formatXAxis}
