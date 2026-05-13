@@ -124,7 +124,10 @@ export default function DataPage() {
           
           <ChartContainer title="Bird Activity" icon={Activity} colorClass="text-green-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={getFilteredData(data.pir)}>
+              <AreaChart 
+              key={`pir-${viewMode}`}
+              data={getFilteredData(data.pir)}
+              >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
                 <XAxis 
                   dataKey="time" 
@@ -143,7 +146,7 @@ export default function DataPage() {
                   fill="#22c55e" 
                   fillOpacity={0.3} 
                   strokeWidth={3} 
-                  animationDuration={1500}
+                  isAnimationActive={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -151,7 +154,10 @@ export default function DataPage() {
 
           <ChartContainer title="Air Temperature" icon={Thermometer} colorClass="text-orange-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={getFilteredData(data.temperature)}>
+              <AreaChart 
+              key={`temperature-${viewMode}`}
+              data={getFilteredData(data.temperature)}
+              >
                 <defs>
                   <linearGradient id="colorTemp" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#f97316" stopOpacity={0.4}/>
@@ -173,7 +179,7 @@ export default function DataPage() {
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
-                  unit="°" 
+                  unit="°C" 
                 />
                 <Tooltip 
                   contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))', fontSize: '12px' }}
@@ -185,6 +191,7 @@ export default function DataPage() {
                   strokeWidth={3} 
                   fillOpacity={1} 
                   fill="url(#colorTemp)" 
+                  isAnimationActive={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -192,7 +199,10 @@ export default function DataPage() {
 
           <ChartContainer title="Light Intensity" icon={Sun} colorClass="text-yellow-500">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={getFilteredData(data.light)}>
+              <AreaChart 
+              key={`light-${viewMode}`}
+              data={getFilteredData(data.light)}
+              >
                 <defs>
                   <linearGradient id="colorLight" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#eab308" stopOpacity={0.2}/>
@@ -206,17 +216,26 @@ export default function DataPage() {
                   fontSize={10} 
                   tickLine={false} 
                   axisLine={false} 
-                  minTickGap={50}
+                  minTickGap={50} 
                 />
                 <YAxis 
                   domain={[0, 'auto']} 
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10} 
                   tickLine={false} 
-                  axisLine={false} 
+                  axisLine={false}
+                  unit="lx" 
                 />
                 <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', borderRadius: '16px', border: '1px solid hsl(var(--border))' }} />
-                <Area type="monotone" dataKey="value" stroke="#eab308" fillOpacity={1} fill="url(#colorLight)" strokeWidth={2} />
+                <Area 
+                type="monotone" 
+                dataKey="value" 
+                stroke="#eab308" 
+                fillOpacity={1} 
+                fill="url(#colorLight)" 
+                strokeWidth={2} 
+                isAnimationActive={false}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </ChartContainer>

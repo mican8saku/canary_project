@@ -69,7 +69,7 @@ sensor_history = {
     "light": [],
     "pir": []
 }
-MAX_POINTS = 1440  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
+MAX_POINTS = 2880  # Sparar t.ex. de senaste 2 timmarna om du mäter var 5:e minut
 
 def save_state():
     try:
@@ -357,63 +357,50 @@ def history_collector_thread():
     
     motion_accumulator = 0
     loop_count = 0
+    LOG_INTERVAL_LOOPS = 60 # 60 * 0.5s = 30 sekunder
 
     while True: 
         try:
-            # --- 1. LÄS SENSORER (Varje sekund) --
-            current_temp = latest_sensor_data["temp"] # Behåll gammalt värde som fallback
-            current_lux = 350.0
-            motion_now = False
-
+            # --- 1. LÄS SENSORER (Körs VARJE 0.5 sekund) ---
             if IS_PI:
-                # Läs Ljus
-                try:
-                    current_lux = round(tsl_sensor.lux, 1)
-                except: pass
-
-                # Läs Rörelse
                 motion_now = (GPIO.input(PIR_PIN) == 1)
                 if motion_now:
                     last_motion_at = datetime.now().isoformat()
-                    motion_accumulator += 1 # För compounding-grafen
+                    motion_accumulator += 1
+                
+                latest_sensor_data["motion_now"] = motion_now
 
-                # Läs Temperatur (DHT11 är petig, läs var 10:e sek är lagom)
-                try:
-                    t = dht_device.temperature
-                    if t is not None:
-                        current_temp = t
-                except:
-                    pass # Behåll senaste lyckade läsningen
+                if loop_count % 20 == 0: # Var 10:e sek
+                    try:
+                        latest_sensor_data["lux"] = round(tsl_sensor.lux, 1)
+                        t = dht_device.temperature
+                        if t is not None: latest_sensor_data["temp"] = t
+                    except: pass
             else:
-                # Mock-data för testmiljö
-                current_lux = 350.0
-                motion_now = False
+                # Mock-data
+                latest_sensor_data["lux"] = 350.0
+                latest_sensor_data["motion_now"] = False
 
-            # Uppdatera globala variabler för blixtsnabb /status
-            latest_sensor_data["temp"] = current_temp
-            latest_sensor_data["lux"] = current_lux
-            latest_sensor_data["motion_now"] = motion_now
             latest_sensor_data["last_updated"] = datetime.now().strftime("%H:%M:%S")
 
-            # --- 2. LOGGA TILL HISTORIK (Varje minut: loop_count 6 * 10s) ---
+            # --- 2. LOGGA TILL HISTORIK (Var 30:e sekund) ---
             loop_count += 1
-            if loop_count >= 120:
+            if loop_count >= LOG_INTERVAL_LOOPS:
                 timestamp = datetime.now().strftime("%H:%M")
 
-                # Spara till minnet
-                sensor_history["temperature"].append({"time": timestamp, "value": current_temp})
-                sensor_history["light"].append({"time": timestamp, "value": current_lux})
+                # Spara snittet/summan till historiken
+                sensor_history["temperature"].append({"time": timestamp, "value": latest_sensor_data["temp"]})
+                sensor_history["light"].append({"time": timestamp, "value": latest_sensor_data["lux"]})
+                # Nu blir pir-värdet hur många gånger rörelse sågs under de 30 sekunderna
                 sensor_history["pir"].append({"time": timestamp, "value": motion_accumulator})
 
-                # Håll 24h historik (1440 punkter)
+                # Håll 24h historik
                 for key in sensor_history:
-                    if len(sensor_history[key]) > 1440:
+                    if len(sensor_history[key]) > MAX_POINTS:
                         sensor_history[key].pop(0)
 
-                # Spara till fil (sensor_history.json)
                 save_history()
 
-                # Nollställ för nästa minut
                 motion_accumulator = 0
                 loop_count = 0
 
