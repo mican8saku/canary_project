@@ -366,9 +366,10 @@ def history_collector_thread():
     
     motion_accumulator = 0
     loop_count = 0
-    LOG_INTERVAL_LOOPS = 60 # 60 * 0.5s = 30 sekunder
+    LOG_INTERVAL_LOOPS = 2 # 60 * 0.5s = 30 sekunder
 
     while True: 
+        print("Loop körs...", flush=True)
         try:
             # --- 1. LÄS SENSORER (Körs VARJE 0.5 sekund) ---
             if IS_PI:
@@ -382,8 +383,8 @@ def history_collector_thread():
                 if loop_count % 20 == 0: # Var 10:e sek
                     try:
                         latest_sensor_data["lux"] = round(tsl_sensor.lux, 1)
-                        t = dht_device.temperature
-                        if t is not None: latest_sensor_data["temp"] = t
+                       #  t = dht_device.temperature
+                       # if t is not None: latest_sensor_data["temp"] = t
                     except: pass
             else:
                 # Mock-data
