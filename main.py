@@ -291,37 +291,38 @@ def automation_routine_thread():
 
     while True:
         try:
-            # 1. Hämta senaste datan från history_collector (som körs 2 ggr/sek)
             motion_now = latest_sensor_data.get("motion_now", False)
             current_lux = latest_sensor_data.get("lux", 350.0)
             
             current_time_ts = time.time()
-            nu = datetime.now()
+            nu = datetime.now() # Använder systemets tid (viktigt att köra sudo timedatectl på Pien!)
             
-            # Uppdatera rörelsetid oavsett override
             if motion_now:
                 last_motion_time = current_time_ts
                 GPIO.output(LED_PIN, GPIO.HIGH)
             else:
                 GPIO.output(LED_PIN, GPIO.LOW)
             
-            # 2. CHECK: MANUAL OVERRIDE (Här räcker det med 1 min som du sätter i API:et)
             if current_time_ts < manual_override_until:
                 time.sleep(1) 
                 continue
             
-            # --- TIDSBERÄKNING ---
+            # --- TYPSÄKRING (Logistiskt skydd mot strängar från frontend) ---
+            win_hours = int(auto_settings.get("window_hours", 1))
+            still_mins = int(auto_settings.get("still_minutes", 5))
+            lux_thresh = float(auto_settings.get("lux_threshold", 30.0))
+            
+            # Skapa tids-objekt för dagens datum
             upp_obj = datetime.strptime(auto_settings["time_up"], "%H:%M").replace(
                 year=nu.year, month=nu.month, day=nu.day)
             ner_obj = datetime.strptime(auto_settings["time_down"], "%H:%M").replace(
                 year=nu.year, month=nu.month, day=nu.day)
             
-            morgon_start = upp_obj - timedelta(hours=auto_settings["window_hours"])
-            kvall_start = ner_obj - timedelta(hours=auto_settings["window_hours"])
+            morgon_start = upp_obj - timedelta(hours=win_hours)
+            kvall_start = ner_obj - timedelta(hours=win_hours)
 
             # --- GARDIN AUTOMATION ---
             if auto_settings["curtain_routine_active"] and not is_moving:
-                # Använd motion_now variabeln vi redan har istället för ny GPIO-läsning
                 
                 # 1. DJUP NATT
                 if nu >= ner_obj or nu < morgon_start:
@@ -341,7 +342,7 @@ def automation_routine_thread():
                 # 4. KVÄLLS-FÖNSTER
                 elif kvall_start <= nu < ner_obj:
                     idle_seconds = current_time_ts - last_motion_time
-                    if idle_seconds >= (auto_settings["still_minutes"] * 60):
+                    if idle_seconds >= (still_mins * 60): # Nu blir matematiken alltid korrekt heltal
                         if curtain_state > 0:
                             start_curtain_thread(0, "Evening: Bird is sleeping")
 
@@ -349,10 +350,10 @@ def automation_routine_thread():
             if auto_settings["led_routine_active"]:
                 if upp_obj <= nu < ner_obj:
                     if curtain_state > 50:
-                        if current_lux < auto_settings["lux_threshold"] and not auto_light_active:
+                        if current_lux < lux_thresh and not auto_light_active:
                             light.set_light(True)
                             auto_light_active = True
-                        elif current_lux >= auto_settings["lux_threshold"] and auto_light_active:
+                        elif current_lux >= lux_thresh and auto_light_active:
                             light.set_light(False)
                             auto_light_active = False
                     else:
@@ -406,49 +407,44 @@ def history_collector_thread():
     
     motion_accumulator = 0
     loop_count = 0
-    LOG_INTERVAL_LOOPS = 240 # 0.25s * 240 = 60 motsvarar 60 sekunder
+    LOG_INTERVAL_LOOPS = 240
 
     while True: 
         try:
-            # --- 1. LÄS SENSORER (Körs VARJE 0.5 sekund) ---
             if IS_PI:
                 motion_now = (GPIO.input(PIR_PIN) == 1)
                 if motion_now:
-                    last_motion_at = datetime.now().isoformat()
+                    # ÄNDRAD TILL UTC för att matcha get_bird_status helt och hållet!
+                    last_motion_at = datetime.now(timezone.utc).isoformat()
                     motion_accumulator += 1
                 
                 latest_sensor_data["motion_now"] = motion_now
 
-                if loop_count % 20 == 0: # Var 10:e sek
-                    try:
-                        latest_sensor_data["lux"] = round(tsl_sensor.lux, 1)
+                if loop_count % 20 == 0:
+                    try: latest_sensor_data["lux"] = round(tsl_sensor.lux, 1)
                     except: pass
             else:
-                # Mock-data
                 latest_sensor_data["lux"] = 0
                 latest_sensor_data["motion_now"] = False
 
             latest_sensor_data["last_updated"] = datetime.now().strftime("%H:%M:%S")
 
-            # --- 2. LOGGA TILL HISTORIK (Var 60:e sekund) ---
+            # --- LOGGA TILL HISTORIK ---
             loop_count += 1
             if loop_count >= LOG_INTERVAL_LOOPS:
                 timestamp = datetime.now().isoformat()
 
-                active_seconds = motion_accumulator / 4 # Delar med 4 för att få antalet rörelser avlästa matcha 60 sekunder. 
+                active_seconds = motion_accumulator / 4 
                 
-                # Spara snittet/summan till historiken
                 sensor_history["temperature"].append({"time": timestamp, "value": latest_sensor_data["temp"]})
                 sensor_history["light"].append({"time": timestamp, "value": latest_sensor_data["lux"]})
                 sensor_history["pir"].append({"time": timestamp, "value": active_seconds})
 
-                # Håll 24h historik
                 for key in sensor_history:
                     if len(sensor_history[key]) > MAX_POINTS:
                         sensor_history[key].pop(0)
 
                 save_history()
-
                 motion_accumulator = 0
                 loop_count = 0
 
@@ -562,12 +558,16 @@ def update_automation_settings():
     global auto_settings
     if request.method == 'POST':
         new_data = request.get_json()
-        # Uppdatera bara de fält som skickas in
+        
+        # Säkra typerna direkt vid mottagandet så vi inte sparar trasig data i state.json
+        if "window_hours" in new_data: new_data["window_hours"] = int(new_data["window_hours"])
+        if "still_minutes" in new_data: new_data["still_minutes"] = int(new_data["still_minutes"])
+        if "lux_threshold" in new_data: new_data["lux_threshold"] = float(new_data["lux_threshold"])
+        
         auto_settings.update(new_data)
         save_state()
         return jsonify({"ok": True, "settings": auto_settings})
     
-    # Om GET, returnera nuvarande inställningar
     return jsonify({"ok": True, "settings": auto_settings})
 
 @app.route('/curtain/open', methods=['POST'])
