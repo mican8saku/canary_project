@@ -249,14 +249,31 @@ def button_control_thread():
         down_pressed = GPIO.input(BUTTON_DOWN) == GPIO.LOW
 
         if up_pressed and curtain_state < 100:
-            motor.kor_gardin(0.05, -1)
-            curtain_state = min(100, curtain_state + 2)
+            # Räkna ut exakt steg så vi inte skjuter över 100%
+            step = min(2, 100 - curtain_state)
+            
+            # Harmoniserad matematik med API (2.8 varv för 100%)
+            # För ett 2% steg blir detta exakt 0.056 varv istället för 0.05
+            varv = (2.8 / 100) * step 
+            
+            if IS_PI:
+                motor.kor_gardin(varv, -1)
+                
+            curtain_state += step
             needs_saving = True
             manual_override_until = time.time() + (1 * 60)
             
         elif down_pressed and curtain_state > 0:
-            motor.kor_gardin(0.05, 1)
-            curtain_state = max(0, curtain_state - 2)
+            # Räkna ut exakt steg så vi inte går under 0%
+            step = min(2, curtain_state)
+            
+            # Harmoniserad matematik med API
+            varv = (2.8 / 100) * step
+            
+            if IS_PI:
+                motor.kor_gardin(varv, 1)
+                
+            curtain_state -= step
             needs_saving = True
             manual_override_until = time.time() + (1 * 60)
         
@@ -265,8 +282,7 @@ def button_control_thread():
                 save_state()
                 print(f"Position låst vid: {curtain_state}%")
                 needs_saving = False
-            
-            time.sleep(0.05)
+        time.sleep(0.05)
 
 def automation_routine_thread():
     global last_motion_time, auto_light_active, curtain_state, is_moving, manual_override_until
