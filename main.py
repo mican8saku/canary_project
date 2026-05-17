@@ -282,7 +282,7 @@ def button_control_thread():
                 save_state()
                 print(f"Position låst vid: {curtain_state}%")
                 needs_saving = False
-        time.sleep(0.05)
+            time.sleep(0.05)
 
 def automation_routine_thread():
     global last_motion_time, auto_light_active, curtain_state, is_moving, manual_override_until
